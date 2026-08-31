@@ -4,6 +4,9 @@ Agenda web para personal trainers — alunos, horários sem conflito, presenças
 
 **Acesse:** https://jcgoliver21.github.io/prancheta/
 
+Instale na tela inicial pelo menu do navegador — o app é um PWA com ícone próprio,
+tela cheia e notificações (Android).
+
 ## Funcionalidades
 
 - Cadastro do treinador (nome, CREF, e-mail) com senha de bloqueio de tela
@@ -14,6 +17,14 @@ Agenda web para personal trainers — alunos, horários sem conflito, presenças
 - Presença/falta com um toque e taxa de frequência por aluno
 - Controle financeiro mensal (pago / em aberto / atrasado) com receita do mês
 - Evolução de peso com gráfico, aniversariantes, atalho de WhatsApp
+- Pacotes de aulas por ciclo com valores pré-definidos, desconto automático por presença e alertas de renovação
+- Planos e promoções cadastráveis, enviados por WhatsApp com seleção do que incluir
+- Mensagens de WhatsApp com variáveis e assinatura automática ("Do seu Personal …")
+- Avaliações físicas completas: peso, IMC, massa magra/gorda, % gordura, medidas, RCQ, índice de corrida (ritmo/km) e meta com progresso
+- Treino de cada dia por aluno (ex.: Seg — Superior), visível na agenda
+- Gastos por categoria, formas de recebimento, academias com repasse e relatórios com gráficos + CSV
+- Lembretes com antecedência, notificações, arquivos/links para envio, foto de aluno e do treinador
+- 20 temas de cor, seletor de data com ano/mês, bloqueio automático
 - Backup exportável/importável em JSON
 - Tema claro/escuro automático, mobile-first
 

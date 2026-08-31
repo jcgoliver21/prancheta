@@ -2,6 +2,10 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2447E0">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" href="icon-192.png">
 <title>Prancheta</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -521,9 +525,11 @@ const S={
 };
 const defDay=(on,start,end)=>({on,start,end});
 const defTemplates=()=>({
-  cobranca:'Olá, {primeiro}! Tudo bem? 💪\nPassando para lembrar da mensalidade de {mes}: {valor}, com vencimento no dia {vencimento}.\nQualquer dúvida, é só me chamar!',
-  cancel:'Olá, {primeiro}! Preciso cancelar nossa sessão de {data} às {hora}. 🙏\nMe diz um bom horário para repormos, combinado?',
-  saldo:'Olá, {primeiro}! 📋 Atualização do seu pacote de aulas: restam {saldo} aula(s).\nVamos programar a renovação? Me avisa!',
+  cobranca:'Olá, {primeiro}! Tudo bem? 💪\nPassando para lembrar da mensalidade de {mes}: {valor}, com vencimento no dia {vencimento}.\nQualquer dúvida, é só me chamar!\n\nDo seu Personal {personal}',
+  cancel:'Olá, {primeiro}! Preciso cancelar nossa sessão de {data} às {hora}. 🙏\nMe diz um bom horário para repormos, combinado?\n\nDo seu Personal {personal}',
+  saldo:'Olá, {primeiro}! 📋 Atualização do seu pacote de aulas: restam {saldo} aula(s).\nVamos programar a renovação? Me avisa!\n\nDo seu Personal {personal}',
+  recibo:'Olá, {primeiro}! ✅ Recebi seu pagamento de {valor} ({forma}) referente a {mes}. Obrigado pela confiança!\n\nDo seu Personal {personal}',
+  parabens:'Parabéns, {primeiro}!! 🎉🎂 Muita saúde, treino e conquistas neste novo ciclo. Conte comigo!\n\nDo seu Personal {personal}',
 });
 const defSettings=()=>({
   days:{0:defDay(false,'07:00','12:00'),1:defDay(true,'06:00','21:00'),2:defDay(true,'06:00','21:00'),
@@ -534,6 +540,8 @@ const defSettings=()=>({
   expCats:['Deslocamento','Combustível','Alimentação','Repasse','Equipamento','Outros'],
   gyms:[], remindMin:30, packWarn:3, lastMethod:'',
   templates:defTemplates(),
+  plans:[], promos:[], packPresets:[], files:[],
+  theme:0, autoLock:0,
 });
 const settings=()=>{
   const d=defSettings(), s=S.data.settings||{};
@@ -710,10 +718,24 @@ function confirmDlg({title,msg,okLabel='Confirmar',danger=false,typed=null,onOk}
 
 /* ================= boot ================= */
 (async function boot(){
+  initSW();
   await initStore();
+  applyTheme(settings().theme);
   $('#splash').style.display='none';
   route();
 })();
+
+/* bloqueio automático por inatividade */
+let _actT=Date.now();
+['click','keydown','touchstart','scroll','wheel','pointermove','input'].forEach(ev=>
+  document.addEventListener(ev,()=>{_actT=Date.now()},{passive:true,capture:true}));
+setInterval(()=>{
+  const al=Number(settings().autoLock)||0;
+  if(al>0&&S.mode==='app'&&Date.now()-_actT>al*60000){
+    if($('#overlay .layer'))return; /* modal aberto = usuário no meio de algo; não descartar rascunho */
+    if(typeof A!=='undefined'&&A['lock-now']){A['lock-now']();toast('Bloqueado por inatividade.')}
+  }
+},30000);
 
 function route(){
   if(!S.data.profile){ S.mode='onboarding'; S.ob={step:0,name:'',cref:'',email:'',hint:'',days:defSettings().days,dur:60,gstep:60}; renderOnboarding(); }
@@ -773,15 +795,15 @@ function daySessions(iso){
     for(const sc of (s.schedule||[])){
       if(sc.d!==wd)continue;
       const kill=exc.find(e=>(e.type==='cancel'||e.type==='move')&&e.date===iso&&e.sid===s.id&&e.time===sc.t);
-      const item={sid:s.id,time:sc.t,dur:sDur(s),kind:'reg'};
+      const item={sid:s.id,time:sc.t,dur:sDur(s),kind:'reg',w:sc.w||''};
       if(kill){ if(kill.type==='cancel')cancelled.push({...item,exc:kill}); }
       else list.push(item);
     }
   }
   for(const e of exc){
     const s=stById(e.sid); if(!s||s.active===false)continue;
-    if(e.type==='move'&&e.toDate===iso)list.push({sid:e.sid,time:e.toTime,dur:sDur(s),kind:'moved',exc:e});
-    if(e.type==='extra'&&e.date===iso)list.push({sid:e.sid,time:e.time,dur:sDur(s),kind:'extra',exc:e});
+    if(e.type==='move'&&e.toDate===iso)list.push({sid:e.sid,time:e.toTime,dur:sDur(s),kind:'moved',exc:e,w:e.w||''});
+    if(e.type==='extra'&&e.date===iso)list.push({sid:e.sid,time:e.time,dur:sDur(s),kind:'extra',exc:e,w:e.w||''});
   }
   list.sort((a,b)=>toMin(a.time)-toMin(b.time));
   cancelled.sort((a,b)=>toMin(a.time)-toMin(b.time));
@@ -832,8 +854,44 @@ function setMark(sid,iso,time,status){
   const doc=clone(S.data.attendance[id]||{sid,ym:ymOf(iso),marks:{}});
   doc.marks=doc.marks||{};
   const k=attKey(iso,time);
-  if(!status){ if(!(k in doc.marks))return; delete doc.marks[k]; putDoc('attendance',id,doc); }
-  else{ doc.marks[k]={s:status}; mergeDoc('attendance',id,{sid,ym:ymOf(iso),marks:{[k]:{s:status}}},doc); }
+  if(!status){
+    const prev=doc.marks[k]; if(!prev)return;
+    /* limpar presença preserva a anotação (entrada sem "s" não conta nas estatísticas) */
+    if(prev.note)doc.marks[k]={note:prev.note}; else delete doc.marks[k];
+    putDoc('attendance',id,doc);
+  }
+  else{
+    const prev=doc.marks[k]||{};
+    const mk={s:status}; if(prev.note)mk.note=prev.note;
+    doc.marks[k]=mk;
+    mergeDoc('attendance',id,{sid,ym:ymOf(iso),marks:{[k]:clone(mk)}},doc);
+  }
+}
+/* anotação NUNCA cria presença: sem marca existente, salva só a nota (sem "s") */
+function setMarkNote(sid,iso,time,note){
+  const id=sid+'_'+ymOf(iso);
+  const doc=clone(S.data.attendance[id]||{sid,ym:ymOf(iso),marks:{}});
+  doc.marks=doc.marks||{};
+  const k=attKey(iso,time);
+  const prev=doc.marks[k];
+  if(!prev&&!note)return;
+  const mk={...(prev||{})};
+  if(note)mk.note=note; else delete mk.note;
+  if(!mk.s&&!mk.note){ delete doc.marks[k]; putDoc('attendance',id,doc); return; }
+  doc.marks[k]=mk;
+  mergeDoc('attendance',id,{sid,ym:ymOf(iso),marks:{[k]:clone(mk)}},doc);
+}
+function streakOf(sid){
+  const marks=[];
+  for(const[id,doc]of Object.entries(S.data.attendance)){
+    if(!id.startsWith(sid+'_')||!doc.marks)continue;
+    for(const[k,v]of Object.entries(doc.marks))marks.push({k,s:v.s});
+  }
+  const rated=marks.filter(m=>m.s==='ok'||m.s==='miss');
+  rated.sort((a,b)=>b.k.localeCompare(a.k));
+  let n=0;
+  for(const m of rated){ if(m.s==='ok')n++; else break; }
+  return n;
 }
 function moveMark(sid,fromIso,fromTime,toIso,toTime){
   const m=getMark(sid,fromIso,fromTime); if(!m)return;
@@ -959,11 +1017,21 @@ function fillTemplate(tpl,ctx){
 }
 function tplCtx(s,extra){
   const art=artigoDe(s);
+  const p=S.data.profile||{};
   return {
     nome:s?s.name:'', primeiro:s?firstName(s.name):'',
     artigo:art, Artigo:art.charAt(0).toUpperCase()+art.slice(1),
+    personal:p.name||'', pix:p.pixKey||'',
     ...(extra||{}),
   };
+}
+/* toda mensagem sai assinada: se o texto não citar {personal}, a assinatura entra no fim */
+function waText(tplKey,s,extra){
+  const tpl=settings().templates[tplKey]||defTemplates()[tplKey]||'';
+  let txt=fillTemplate(tpl,tplCtx(s,extra));
+  if(!tpl.includes('{personal}')&&!txt.includes('Do seu Personal'))
+    txt+='\n\nDo seu Personal '+((S.data.profile||{}).name||'');
+  return txt;
 }
 
 /* ---------- pacotes de aulas ---------- */
@@ -1061,11 +1129,50 @@ function gymRepasse(y,m){
   return out;
 }
 
+/* ---------- temas ---------- */
+const THEMES=[
+  ['Cobalto',228,72],['Índigo',245,70],['Roxo',262,68],['Violeta',278,65],['Magenta',300,62],
+  ['Rosa',330,70],['Cereja',348,72],['Vermelho',4,72],['Coral',14,78],['Laranja',26,85],
+  ['Âmbar',38,88],['Mostarda',48,70],['Oliva',75,45],['Verde',140,55],['Esmeralda',158,60],
+  ['Turquesa',174,62],['Ciano',190,75],['Céu',204,80],['Aço',214,42],['Grafite',222,16],
+];
+let _appliedTheme=-1;
+function applyTheme(i){
+  i=Number(i)||0;
+  if(i===_appliedTheme)return;
+  _appliedTheme=i;
+  let el=document.getElementById('theme-style');
+  /* anexa ao fim do BODY: o CSS principal pode viver no body (artifact), e o tema
+     precisa vir depois dele na ordem do documento para vencer empates de cascata */
+  if(!el){el=document.createElement('style');el.id='theme-style';(document.body||document.head).appendChild(el)}
+  if(i<=0||i>=THEMES.length){el.textContent='';return}
+  const[,h,s]=THEMES[i];
+  const L=`--btn:hsl(${h},${s}%,46%);--btn-h:hsl(${h},${s}%,38%);--accent:hsl(${h},${Math.min(s+8,90)}%,42%);--accent-soft:hsl(${h},${Math.round(s*.8)}%,93%)`;
+  const D=`--btn:hsl(${h},${Math.min(s+8,85)}%,58%);--btn-h:hsl(${h},${Math.min(s+8,85)}%,66%);--accent:hsl(${h},${Math.min(s+20,92)}%,76%);--accent-soft:hsl(${h},${Math.max(Math.round(s*.55),14)}%,19%)`;
+  el.textContent=`:root{${L}}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){${D}}}
+:root[data-theme="dark"]{${D}}`;
+}
+
 /* ---------- lembretes e notificações ---------- */
+let SW=null;
+function initSW(){
+  try{
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.register('sw.js').then(r=>{SW=r}).catch(()=>{});
+    }
+  }catch(e){}
+}
 function canNotify(){ return 'Notification' in window; }
 function notify(title,body){
   toast(title+(body?' — '+body:''),'warn');
-  try{ if(canNotify()&&Notification.permission==='granted')new Notification(title,{body,icon:undefined}); }catch(e){}
+  try{ if(navigator.vibrate)navigator.vibrate([160,80,160]); }catch(e){}
+  try{
+    if(!canNotify()||Notification.permission!=='granted')return;
+    /* Android Chrome só aceita notificação via Service Worker; desktop aceita o construtor */
+    if(SW&&SW.showNotification){SW.showNotification(title,{body,tag:'prancheta'});return}
+    try{new Notification(title,{body})}catch(e2){}
+  }catch(e){}
 }
 const firedKey='prancheta-fired-v1';
 function firedMap(){ try{return JSON.parse(localStorage.getItem(firedKey)||'{}')}catch(e){return{}} }
@@ -1135,6 +1242,65 @@ function pickPhoto(cb){
   });
   inp.click();
 }
+/* ---------- avaliações: métricas ---------- */
+function imcOf(w,hcm){ const h=Number(hcm)/100; return w&&h?w/(h*h):null; }
+function imcClass(v){ return v==null?'':v<18.5?'abaixo do peso':v<25?'peso normal':v<30?'sobrepeso':v<35?'obesidade I':v<40?'obesidade II':'obesidade III'; }
+function paceOf(dist,timeMin){ const d=Number(dist),t=Number(timeMin); return d>0&&t>0?t/d:null; }
+function fmtPace(p){ if(p==null)return'—'; const m=Math.floor(p),s=Math.round((p-m)*60); return m+':'+pad(s)+'/km'; }
+const EVAL_METRICS=[
+  ['w','Peso','kg',1],['mm','M. magra','kg',1],['mg','M. gorda','kg',1],['bf','Gordura','%',1],
+  ['pace','Ritmo','min/km',-1],
+];
+function evalVal(e,key){
+  if(key==='pace')return paceOf(e.runDist,e.runTime);
+  const v=Number(e[key]); return isFinite(v)&&v>0?v:null;
+}
+
+/* ---------- seletor de data (ano/mês/dia) ---------- */
+function openDatePicker(curISO,onPick){
+  const base=curISO&&/^\d{4}-\d{2}-\d{2}$/.test(curISO)?dateOf(curISO):new Date();
+  let vy=base.getFullYear(), vm=base.getMonth();
+  const id=uid('dp');
+  const thisYear=new Date().getFullYear();
+  const years=[]; for(let y=thisYear+2;y>=1930;y--)years.push(y);
+  openLayer(`<div class="modal" role="dialog" style="max-width:340px">
+    <div class="m-head"><h2>Escolher data</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
+    <div class="m-body">
+      <div class="row" style="margin-bottom:12px">
+        <select id="${id}-m" class="grow" style="background:var(--surface);border:1.5px solid var(--line);border-radius:9px;padding:8px">${MON.map((m2,i)=>`<option value="${i}" ${i===vm?'selected':''}>${m2[0].toUpperCase()+m2.slice(1)}</option>`).join('')}</select>
+        <select id="${id}-y" style="background:var(--surface);border:1.5px solid var(--line);border-radius:9px;padding:8px;font-variant-numeric:tabular-nums">${years.map(y=>`<option ${y===vy?'selected':''}>${y}</option>`).join('')}</select>
+      </div>
+      <div id="${id}-g" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center"></div>
+    </div></div>`);
+  const paint=()=>{
+    vy=Number($('#'+id+'-y').value); vm=Number($('#'+id+'-m').value);
+    const first=new Date(vy,vm,1), nDays=new Date(vy,vm+1,0).getDate();
+    const today=todayISO(), sel=curISO;
+    let h=WDS.map(w=>`<span class="small muted" style="font-weight:700;font-size:10px">${w[0]}</span>`).join('');
+    for(let i=0;i<first.getDay();i++)h+='<span></span>';
+    for(let d2=1;d2<=nDays;d2++){
+      const iso=vy+'-'+pad(vm+1)+'-'+pad(d2);
+      h+=`<button data-iso="${iso}" style="padding:7px 0;border-radius:8px;font-size:13px;font-variant-numeric:tabular-nums;font-weight:600;
+        ${iso===sel?'background:var(--btn);color:var(--on-btn)':iso===today?'color:var(--accent);font-weight:800':''}">${d2}</button>`;
+    }
+    $('#'+id+'-g').innerHTML=h;
+  };
+  paint();
+  $('#'+id+'-y').addEventListener('change',paint);
+  $('#'+id+'-m').addEventListener('change',paint);
+  $('#'+id+'-g').addEventListener('click',e=>{
+    const b=e.target.closest('button[data-iso]'); if(!b)return;
+    closeLayer(); onPick(b.dataset.iso);
+  });
+}
+/* campo de data com botão de calendário completo */
+function dateField(id2,label,value){
+  return `<div class="f"><label>${label}</label><div class="row" style="gap:6px">
+    <input id="${id2}" type="date" value="${esc(value||'')}" class="grow" style="min-width:0">
+    <button type="button" class="icon-btn" style="border:1.5px solid var(--line);width:42px;height:42px" data-a="datepick" data-for="${id2}" title="Abrir calendário">${I.cal}</button>
+  </div></div>`;
+}
+
 function safePhoto(p){
   return (typeof p==='string'&&/^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(p))?p:'';
 }
@@ -1254,6 +1420,7 @@ function renderLock(){
 }
 /* ================= render dispatch ================= */
 function renderMain(){
+  applyTheme(settings().theme);
   const v=S.ui.view; let html='', fab='';
   if(v==='hoje')html=vHoje();
   else if(v==='agenda'){html=vAgenda();fab=`<button class="fab" data-a="extra-new" aria-label="Sessão avulsa">${I.plus}</button>`}
@@ -1269,6 +1436,8 @@ function afterRender(v){
   if(v==='alunos'){
     const q=$('#stu-q');
     if(q){q.value=S.ui.q; q.addEventListener('input',()=>{S.ui.q=q.value;const l=$('#stu-list');if(l)l.innerHTML=stuListHTML()});}
+    const gf=$('#stu-gymf');
+    if(gf)gf.addEventListener('change',()=>{S.ui.gymF=gf.value;const l=$('#stu-list');if(l)l.innerHTML=stuListHTML()});
   }
 }
 function go(view,extra){ Object.assign(S.ui,{view},extra||{}); renderMain(); window.scrollTo(0,0); }
@@ -1281,18 +1450,22 @@ function vHoje(){
   let done=0; list.forEach(it=>{const m=getMark(it.sid,iso,it.time);if(m&&m.s==='ok')done++});
   const bd=students().filter(s=>s.active!==false&&s.birth&&s.birth.slice(5)===iso.slice(5));
   const upcoming=birthdaysOf(t.getMonth()+1).filter(s=>s.bday>=t.getDate()).slice(0,3);
+  const wk=weekOf(iso);
+  let wkTotal=0,wkDone=0;
+  for(const wiso of wk){const dd=daySessions(wiso).list;wkTotal+=dd.length;dd.forEach(it=>{const mm=getMark(it.sid,wiso,it.time);if(mm&&mm.s==='ok')wkDone++})}
   return `<div class="hd"><div>
       <h1>${greet()}, ${esc(firstName(S.data.profile.name))} 👋</h1>
       <div class="sub">${fmtLong(iso)}</div>
     </div>
     <button class="btn sm ghost" data-a="stu-new">${I.plus} Aluno</button></div>
-  ${bd.map(s=>`<div class="banner" style="margin-bottom:12px"><span style="flex:none">🎉</span><span class="grow">Hoje é aniversário de <b>${esc(s.name)}</b>!</span></div>`).join('')}
+  ${bd.map(s=>`<div class="banner" style="margin-bottom:12px"><span style="flex:none">🎉</span><span class="grow">Hoje é aniversário de <b>${esc(s.name)}</b>!</span>${whatsHref(s.phone)?`<button class="btn sm" data-a="wa-parabens" data-sid="${s.id}" style="flex:none">Parabenizar</button>`:''}</div>`).join('')}
   ${packAlerts().slice(0,3).map(a=>`<button class="banner warnb" style="margin-bottom:12px;width:100%;text-align:left;cursor:pointer" data-a="stu" data-sid="${a.s.id}"><span style="flex:none">📦</span><span class="grow">${
     a.none?`<b>${esc(a.s.name)}</b> está sem pacote de aulas ativo.`
     :a.out?`<b>${esc(a.s.name)}</b> está com o pacote esgotado${a.left<0?' ('+(-a.left)+' aula(s) além do saldo)':''} — hora de renovar!`
     :`<b>${esc(a.s.name)}</b> tem só <b>${a.left}</b> aula(s) restantes no pacote.`}</span></button>`).join('')}
   <div class="tiles">
     <div class="tile"><div class="l">Sessões hoje</div><div class="v big-num">${list.length}</div><div class="d">${done} concluída${done===1?'':'s'}</div></div>
+    <div class="tile"><div class="l">Esta semana</div><div class="v big-num">${wkTotal}</div><div class="d">${wkDone} concluída${wkDone===1?'':'s'}</div></div>
     <div class="tile"><div class="l">Alunos ativos</div><div class="v big-num">${activeStudents().length}</div><div class="d">${students().length-activeStudents().length} pausado(s)</div></div>
     <div class="tile"><div class="l">Ocupação semanal</div><div class="v big-num">${occ.pct}%</div><div class="bar" style="margin-top:7px"><i class="acc" style="width:${occ.pct}%"></i></div></div>
     <div class="tile"><div class="l">Recebido no mês</div><div class="v big-num" style="font-size:19px;padding-top:5px">${brl(rev.got)}</div><div class="d">de ${brl(rev.exp)} previstos</div></div>
@@ -1333,7 +1506,7 @@ function sessCard(iso,it){
     <div class="tm mono">${it.time}<span class="e">${toHM(toMin(it.time)+it.dur)}</span></div>
     <button class="who" data-a="sess-sheet" data-iso="${iso}" data-sid="${it.sid}" data-time="${it.time}" data-kind="${it.kind}">
       ${avatarHTML(s,'s40',COLORS[6])}
-      <span class="grow"><span class="nm">${esc(s.name)} ${flag}</span><br><span class="g">${esc(s.goal||'')}${s.goal&&it.dur?' · ':''}${it.dur} min</span></span>
+      <span class="grow"><span class="nm">${esc(s.name)} ${flag}</span><br><span class="g">${it.w?'<b style="color:var(--accent)">'+esc(it.w)+'</b> · ':''}${esc(s.goal||'')}${s.goal&&it.dur?' · ':''}${it.dur} min</span></span>
     </button>
     <div class="acts">
       <button class="mark ${st==='ok'?'ok-on':''}" title="Presente" data-a="mark" data-sid="${it.sid}" data-iso="${iso}" data-time="${it.time}" data-s="ok">${I.check}</button>
@@ -1419,8 +1592,9 @@ function weekGridHTML(wk){
         const top=(toMin(it.time)-lo)*ppm, h2=Math.max(20,it.dur*ppm-3);
         const fl=it.kind==='extra'?'AV':it.kind==='moved'?'RM':'';
         return`<button class="blk" style="top:${top}px;height:${h2}px;background:${s.color||COLORS[6]}"
+          title="${esc(s.name)} · ${it.time}${it.w?' · '+esc(it.w):''}"
           data-a="sess-sheet" data-iso="${d.iso}" data-sid="${it.sid}" data-time="${it.time}" data-kind="${it.kind}">
-          ${fl?`<span class="fl">${fl}</span>`:''}<span class="t">${it.time}</span><span class="n">${esc(s.name)}</span></button>`;
+          ${fl?`<span class="fl">${fl}</span>`:''}<span class="t">${it.time}${it.w?' · '+esc(it.w):''}</span><span class="n">${esc(s.name)}</span></button>`;
       }).join('')+d.data.cancelled.map(it=>{
         const s=stById(it.sid); if(!s)return'';
         const top=(toMin(it.time)-lo)*ppm, h2=Math.max(20,it.dur*ppm-3);
@@ -1454,9 +1628,14 @@ function openSessSheet(iso,sid,time,kind){
     <div class="m-head">
       ${avatarHTML(s,'s40',COLORS[6])}
       <div class="grow"><h2 style="font-size:15.5px">${esc(s.name)}</h2>
-      <div class="small muted mono">${fmtDM(iso)} · ${it.time}–${toHM(toMin(it.time)+it.dur)} · ${kindL}</div></div>
+      <div class="small muted mono">${fmtDM(iso)} · ${it.time}–${toHM(toMin(it.time)+it.dur)} · ${kindL}${it.w?' · '+esc(it.w):''}</div></div>
       <button class="icon-btn" data-a="layer-close">${I.x}</button></div>
     <div class="m-body">
+      <div class="row" style="margin-bottom:14px;align-items:stretch">
+        <input id="sess-note-in" value="${esc((m&&m.note)||'')}" placeholder="Anotação da sessão (carga, evolução, obs.)…"
+          style="flex:1;min-width:0;background:var(--surface);border:1.5px solid var(--line);border-radius:9px;padding:8px 11px;font-size:13px">
+        <button class="btn sm soft" data-a="sess-note" data-sid="${sid}" data-iso="${iso}" data-time="${time}">Salvar</button>
+      </div>
       <div class="eyebrow" style="margin-bottom:8px">Presença</div>
       <div class="row" style="margin-bottom:18px">
         <button class="btn ${st==='ok'?'':'soft'} grow" data-a="mark-close" data-sid="${sid}" data-iso="${iso}" data-time="${time}" data-s="ok" style="${st==='ok'?'background:var(--ok);color:var(--on-ok)':''}">${I.check} Presente</button>
@@ -1509,7 +1688,7 @@ function openMoveSheet(iso,sid,time,kind){
     if(!nd||!nt){$('#'+id+'-err').innerHTML='<div class="f"><div class="err">Escolha data e horário.</div></div>';return}
     const c=conflictOnDate(nd,nt,it.dur,skip);
     if(c){$('#'+id+'-err').innerHTML=`<div class="f"><div class="err">Conflito: ${esc((stById(c.sid)||{}).name||'outro aluno')} às ${c.time}.</div></div>`;return}
-    if(kind==='reg')addExc({type:'move',date:iso,sid,time:it.time,toDate:nd,toTime:nt});
+    if(kind==='reg')addExc({type:'move',date:iso,sid,time:it.time,toDate:nd,toTime:nt,w:it.w||''});
     else if(kind==='moved')updExc(it.exc,{toDate:nd,toTime:nt});
     else updExc(it.exc,{date:nd,time:nt});
     moveMark(sid,iso,it.time,nd,nt);
@@ -1528,6 +1707,7 @@ function openExtraSheet(){
       <div class="f"><label>Aluno</label><select id="${id}-s">${list.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></div>
       <div class="f"><label>Data</label><input type="date" id="${id}-d" value="${S.ui.selDate}"></div>
       <div class="f"><label>Horário</label><select id="${id}-t"></select><div class="hint" id="${id}-h"></div></div>
+      <div class="f"><label>Treino (opcional)</label><input id="${id}-w" placeholder="Ex.: Reposição de superior"></div>
       <div id="${id}-err"></div>
     </div>
     <div class="m-foot"><button class="btn soft" data-a="layer-close">Cancelar</button><button class="btn" id="${id}-ok">Agendar</button></div>
@@ -1553,7 +1733,7 @@ function openExtraSheet(){
     if(!sid||!nd||!nt){$('#'+id+'-err').innerHTML='<div class="f"><div class="err">Preencha todos os campos.</div></div>';return}
     const c=conflictOnDate(nd,nt,sDur(s),null);
     if(c){$('#'+id+'-err').innerHTML=`<div class="f"><div class="err">Conflito: ${esc((stById(c.sid)||{}).name||'')} às ${c.time}.</div></div>`;return}
-    addExc({type:'extra',date:nd,sid,time:nt});
+    addExc({type:'extra',date:nd,sid,time:nt,w:($('#'+id+'-w').value||'').trim()});
     closeAllLayers(); S.ui.view='agenda'; S.ui.selDate=nd; renderMain();
     toast('Sessão avulsa agendada ✓');
   });
@@ -1566,6 +1746,10 @@ function vAlunos(){
   <div class="filterbar">
     <div class="search">${I.search}<input id="stu-q" placeholder="Buscar aluno…" autocomplete="off"></div>
     <div class="seg">${[['ativos','Ativos'],['todos','Todos'],['pausados','Pausados']].map(([k,l])=>`<button class="${S.ui.filter===k?'on':''}" data-a="stu-filter" data-f="${k}">${l}</button>`).join('')}</div>
+    ${(settings().gyms||[]).length?`<select id="stu-gymf" style="background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px">
+      <option value="">Todas as academias</option>
+      ${(settings().gyms||[]).map(g=>`<option value="${g.id}" ${S.ui.gymF===g.id?'selected':''}>${esc(g.name)}</option>`).join('')}
+    </select>`:''}
   </div>
   <div id="stu-list" class="lst">${stuListHTML()}</div>`;
 }
@@ -1573,6 +1757,7 @@ function stuListHTML(){
   const q=S.ui.q.trim().toLowerCase(), f=S.ui.filter;
   let list=students().filter(s=>
     (f==='todos'||(f==='ativos'?s.active!==false:s.active===false))&&
+    (!S.ui.gymF||s.gymId===S.ui.gymF)&&
     (!q||s.name.toLowerCase().includes(q)||(s.goal||'').toLowerCase().includes(q)));
   list.sort((a,b)=>a.name.localeCompare(b.name));
   if(!list.length)return`<div class="empty">${I.users}<div class="big">${q?'Nenhum aluno encontrado':'Nenhum aluno por aqui'}</div>${q?'Tente outra busca.':'Toque em “Novo aluno” para começar.'}</div>`;
@@ -1605,7 +1790,7 @@ function vAluno(){
   const marks=[];
   for(const[id,doc]of Object.entries(S.data.attendance)){
     if(!id.startsWith(s.id+'_')||!doc.marks)continue;
-    for(const[k,v]of Object.entries(doc.marks))marks.push({k,...v});
+    for(const[k,v]of Object.entries(doc.marks))if(v.s==='ok'||v.s==='miss')marks.push({k,...v});
   }
   marks.sort((a,b)=>b.k.localeCompare(a.k));
   const age=s.birth?Math.floor((Date.now()-dateOf(s.birth).getTime())/31557600000):null;
@@ -1615,6 +1800,7 @@ function vAluno(){
     <div class="grow"><h1>${esc(s.name)}</h1>
       <div class="row" style="gap:6px;margin-top:4px;flex-wrap:wrap">
         ${s.active===false?'<span class="pill mut">Pausado</span>':'<span class="pill ok">Ativo</span>'}
+        ${(()=>{const st2=streakOf(s.id);return st2>=3?`<span class="pill warn">🔥 ${st2} seguidas</span>`:''})()}
         <span class="pill ${s.plan==='pacote'?'acc':'mut'}">${s.plan==='pacote'?'Pacote de aulas':'Mensalidade'}</span>
         ${s.goal?`<span class="pill acc">${esc(s.goal)}</span>`:''}
         ${age!==null?`<span class="pill mut">${age} anos</span>`:''}
@@ -1623,6 +1809,7 @@ function vAluno(){
   </div>
   <div class="stu-actions">
     ${wa?`<a class="btn sm soft" href="${wa}" target="_blank" rel="noopener">${I.phone} WhatsApp</a>`:''}
+    ${wa?`<button class="btn sm soft" data-a="send-plans" data-sid="${s.id}">${I.cash} Enviar planos</button>`:''}
     <button class="btn sm soft" data-a="stu-edit" data-sid="${s.id}">${I.edit} Editar</button>
     <button class="btn sm soft" data-a="stu-toggle" data-sid="${s.id}">${s.active===false?'Reativar':'Pausar'}</button>
     <button class="btn sm danger ghost" data-a="stu-del" data-sid="${s.id}">${I.trash} Excluir</button>
@@ -1632,12 +1819,14 @@ function vAluno(){
     <div class="it"><div class="k">Vencimento</div><div class="v">Dia ${s.dueDay||5}</div></div>`:''}
     <div class="it"><div class="k">Início</div><div class="v mono">${s.start?fmtDMY(s.start):'—'}</div></div>
     <div class="it"><div class="k">Duração</div><div class="v">${sDur(s)} min${s.dur?'':' (padrão)'}</div></div>
+    ${s.height?`<div class="it"><div class="k">Altura</div><div class="v mono">${s.height} cm</div></div>`:''}
+    ${Number(s.goalWeight)>0?`<div class="it"><div class="k">Meta de peso</div><div class="v mono">${Number(s.goalWeight).toLocaleString('pt-BR')} kg</div></div>`:''}
     ${s.phone?`<div class="it"><div class="k">Telefone</div><div class="v mono">${esc(s.phone)}</div></div>`:''}
     ${s.birth?`<div class="it"><div class="k">Nascimento</div><div class="v mono">${fmtDMY(s.birth)}</div></div>`:''}
   </div></div>
   <div class="sec"><div class="row between"><div class="eyebrow">Horários fixos</div>
     <button class="btn sm ghost" data-a="stu-edit" data-sid="${s.id}">Editar horários</button></div>
-    ${(s.schedule||[]).length?`<div class="schedchips" style="margin-top:4px">${s.schedule.slice().sort((a,b)=>(a.d===0?7:a.d)-(b.d===0?7:b.d)||toMin(a.t)-toMin(b.t)).map(x=>`<span class="schedchip" style="padding-right:11px">${WDS[x.d]} ${x.t}</span>`).join('')}</div>`
+    ${(s.schedule||[]).length?`<div class="schedchips" style="margin-top:4px">${s.schedule.slice().sort((a,b)=>(a.d===0?7:a.d)-(b.d===0?7:b.d)||toMin(a.t)-toMin(b.t)).map(x=>`<span class="schedchip" style="padding-right:11px">${WDS[x.d]} ${x.t}${x.w?' · '+esc(x.w):''}</span>`).join('')}</div>`
       :'<p class="small muted">Sem horário fixo — use sessões avulsas ou edite o aluno.</p>'}
   </div>
   <div class="sec"><div class="eyebrow">Frequência</div>
@@ -1659,21 +1848,7 @@ function vAluno(){
       return`<button class="paycell ${cls}" data-a="${ps.st==='pago'?'pay-toggle':'pay-open'}" data-sid="${s.id}" data-y="${y}" data-m="${m}" ${off?'disabled':''}><span class="m">${MONS[i]}</span><span class="s mono">${lbl}</span></button>`;
     }).join('')}</div>
     <p class="hint" style="margin-top:9px;color:var(--ink2);font-size:11.5px">Toque em um mês para marcar ou desfazer o pagamento.</p></div></div>`:''}
-  <div class="sec"><div class="row between"><div class="eyebrow">Evolução de peso</div>
-    <button class="btn sm ghost" data-a="eval-new" data-sid="${s.id}">${I.plus} Registrar</button></div>
-    <div class="card">${entries.length?evalChart(entries)+`
-      <div style="margin-top:12px">${entries.slice(-6).reverse().map((e2,i0)=>{
-        const idx=entries.length-1-i0;
-        const prev=entries[idx-1];
-        const d2=prev?(e2.w-prev.w):null;
-        return`<div class="row" style="padding:6px 0;border-top:${i0?'1px solid var(--line)':'none'}">
-          <span class="mono small" style="width:78px">${fmtDMY(e2.d)}</span>
-          <b class="mono">${e2.w.toLocaleString('pt-BR')} kg</b>
-          ${d2!==null?`<span class="pill ${d2<0?'ok':d2>0?'warn':'mut'}" style="font-size:10.5px">${d2>0?'+':''}${d2.toLocaleString('pt-BR',{maximumFractionDigits:1})}</span>`:''}
-          <span class="grow small muted" style="text-align:right">${esc(e2.note||'')}</span>
-          <button class="icon-btn" style="width:28px;height:28px" data-a="eval-del" data-sid="${s.id}" data-i="${idx}" title="Excluir">${I.x}</button>
-        </div>`;}).join('')}</div>`
-      :'<p class="small muted">Registre o peso do aluno para acompanhar a evolução aqui.</p>'}</div></div>
+  ${evalSectionHTML(s,entries)}
   <div class="sec"><div class="eyebrow">Observações</div>
     <div class="card" style="min-height:52px;font-size:14px;white-space:pre-wrap">${s.notes?esc(s.notes):'<span class="muted small">Sem observações. Use “Editar” para anotar lesões, restrições, preferências…</span>'}</div></div>`;
 }
@@ -1709,6 +1884,78 @@ function packSectionHTML(s,wa){
         </div>`}).join('')}</div>`:''}
     </div></div>`;
 }
+function evalSectionHTML(s,entries){
+  const avail=EVAL_METRICS.filter(([k])=>entries.filter(e2=>evalVal(e2,k)!=null).length>=2);
+  let met=S.ui.evalMetric||'w';
+  if(avail.length&&!avail.some(([k])=>k===met))met=avail[0][0];
+  const last=entries.length?entries[entries.length-1]:null;
+  const firstE=entries.length?entries[0]:null;
+  const imc=last?imcOf(evalVal(last,'w'),s.height):null;
+  const rcq=last&&Number(last.waist)>0&&Number(last.hip)>0?Number(last.waist)/Number(last.hip):null;
+  const pace=last?paceOf(last.runDist,last.runTime):null;
+  const goal=Number(s.goalWeight)||0;
+  let goalPct=null;
+  if(goal&&firstE&&last){
+    const w0=evalVal(firstE,'w'),w1=evalVal(last,'w');
+    if(w0&&w1&&w0!==goal)goalPct=Math.max(0,Math.min(100,Math.round((w0-w1)/(w0-goal)*100)));
+  }
+  const cmp=[];
+  if(firstE&&last&&firstE!==last){
+    for(const[k,l,u]of EVAL_METRICS){
+      const a=evalVal(firstE,k),b=evalVal(last,k);
+      if(a!=null&&b!=null)cmp.push({l,u,a,b,d:b-a,inv:k==='pace'});
+    }
+  }
+  const fmtV=(v,u)=>u==='min/km'?fmtPace(v):v.toLocaleString('pt-BR',{maximumFractionDigits:1})+' '+u;
+  const series=entries.map(e2=>({d:e2.d,v:evalVal(e2,met)})).filter(x=>x.v!=null);
+  const mdef=EVAL_METRICS.find(m2=>m2[0]===met)||EVAL_METRICS[0];
+  return `<div class="sec"><div class="row between" style="flex-wrap:wrap;gap:8px"><div class="eyebrow">Avaliações físicas</div>
+    <button class="btn sm" data-a="eval-new" data-sid="${s.id}">${I.plus} Nova avaliação</button></div>
+    <div class="card">
+      ${last?`<div class="kv" style="margin-bottom:14px">
+        ${evalVal(last,'w')!=null?`<div class="it"><div class="k">Peso</div><div class="v mono">${fmtV(evalVal(last,'w'),'kg')}</div></div>`:''}
+        ${imc!=null?`<div class="it"><div class="k">IMC</div><div class="v mono">${imc.toFixed(1)}</div><div class="small muted">${imcClass(imc)}</div></div>`:''}
+        ${evalVal(last,'mm')!=null?`<div class="it"><div class="k">Massa magra</div><div class="v mono">${fmtV(evalVal(last,'mm'),'kg')}</div></div>`:''}
+        ${evalVal(last,'mg')!=null?`<div class="it"><div class="k">Massa gorda</div><div class="v mono">${fmtV(evalVal(last,'mg'),'kg')}</div></div>`:''}
+        ${evalVal(last,'bf')!=null?`<div class="it"><div class="k">% Gordura</div><div class="v mono">${fmtV(evalVal(last,'bf'),'%')}</div></div>`:''}
+        ${rcq!=null?`<div class="it"><div class="k">RCQ</div><div class="v mono">${rcq.toFixed(2)}</div><div class="small muted">cintura ÷ quadril</div></div>`:''}
+        ${pace!=null?`<div class="it"><div class="k">Ritmo de corrida</div><div class="v mono">${fmtPace(pace)}</div><div class="small muted">${Number(last.runDist).toLocaleString('pt-BR')} km em ${last.runTime} min</div></div>`:''}
+      </div>`:''}
+      ${goalPct!==null?`<div style="margin-bottom:14px"><div class="row between small" style="margin-bottom:5px"><b>Meta: ${goal.toLocaleString('pt-BR')} kg</b><span class="muted mono">${goalPct}%</span></div><div class="bar"><i class="acc" style="width:${goalPct}%"></i></div></div>`:''}
+      ${avail.length&&series.length>=2?`<div class="seg" style="margin-bottom:10px;flex-wrap:wrap">${avail.map(([k,l])=>`<button class="${met===k?'on':''}" data-a="eval-metric" data-m="${k}">${l}</button>`).join('')}</div>
+        ${metricChart(series,mdef)}`:''}
+      ${cmp.length?`<div style="margin-top:14px"><div class="eyebrow" style="margin-bottom:7px">Primeira × última avaliação</div>
+        ${cmp.map(c=>`<div class="row small" style="padding:4px 0"><span style="width:92px;color:var(--ink2);font-weight:600">${c.l}</span>
+          <span class="mono">${fmtV(c.a,c.u)} → <b>${fmtV(c.b,c.u)}</b></span>
+          <span class="pill ${(c.inv?c.d<0:c.l==='M. magra'?c.d>0:c.d<0)?'ok':c.d===0?'mut':'warn'}" style="font-size:10px">${c.d>0?'+':''}${c.u==='min/km'?(c.d*60).toFixed(0)+'s/km':c.d.toLocaleString('pt-BR',{maximumFractionDigits:1})}</span>
+        </div>`).join('')}</div>`:''}
+      ${entries.length?`<div style="margin-top:12px">${entries.slice(-6).reverse().map(e2=>{
+        const idx=entries.indexOf(e2);
+        const bits=[];
+        if(evalVal(e2,'w')!=null)bits.push(evalVal(e2,'w').toLocaleString('pt-BR')+' kg');
+        if(evalVal(e2,'bf')!=null)bits.push(evalVal(e2,'bf').toLocaleString('pt-BR')+'% gord.');
+        const pc=paceOf(e2.runDist,e2.runTime); if(pc!=null)bits.push(fmtPace(pc));
+        return`<div class="row" style="padding:6px 0;border-top:1px solid var(--line)">
+          <span class="mono small" style="width:78px">${fmtDMY(e2.d)}</span>
+          <span class="grow small"><b>${bits.join(' · ')||'—'}</b>${e2.note?'<span class="muted"> · '+esc(e2.note)+'</span>':''}</span>
+          <button class="icon-btn" style="width:28px;height:28px" data-a="eval-del" data-sid="${s.id}" data-i="${idx}" title="Excluir">${I.x}</button>
+        </div>`}).join('')}</div>`
+      :'<p class="small muted">Registre peso, composição corporal, medidas e índice de corrida — a evolução aparece aqui em gráficos.</p>'}
+    </div></div>`;
+}
+function metricChart(series,mdef){
+  const pts=series.slice(-12);
+  const vs=pts.map(p=>p.v), min=Math.min(...vs), max=Math.max(...vs);
+  const pad2=(max-min)||1, W=560, H=64;
+  const xy=pts.map((p,i)=>[pts.length===1?W/2:8+i*(W-16)/(pts.length-1),H-8-((p.v-min)/pad2)*(H-16)]);
+  const line=xy.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+  const last=xy[xy.length-1];
+  const fmt=v=>mdef[2]==='min/km'?fmtPace(v):v.toLocaleString('pt-BR',{maximumFractionDigits:1});
+  return`<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Evolução de ${mdef[1]}">
+    <polygon class="ar" points="${xy[0][0]},${H} ${line} ${last[0]},${H}"/>
+    <polyline points="${line}"/><circle cx="${last[0]}" cy="${last[1]}" r="3.5"/></svg>
+  <div class="row between small muted mono"><span>${fmtDM(pts[0].d)}</span><span>${fmt(min)}–${fmt(max)} ${mdef[2]==='min/km'?'':mdef[2]}</span><span>${fmtDM(pts[pts.length-1].d)}</span></div>`;
+}
 function evalChart(entries){
   const pts=entries.slice(-12);
   const ws=pts.map(p=>p.w), min=Math.min(...ws), max=Math.max(...ws);
@@ -1726,7 +1973,7 @@ function openStudentForm(sid){
   const ex=sid?stById(sid):null;
   S.draft=ex?clone(ex):{name:'',phone:'',goal:'',color:COLORS[Math.floor(Math.random()*COLORS.length)],
     fee:'',dueDay:5,birth:'',start:todayISO(),notes:'',active:true,dur:null,schedule:[],
-    gender:'',plan:'mensal',gymId:'',photo:''};
+    gender:'',plan:'mensal',gymId:'',photo:'',height:'',goalWeight:''};
   S.draft.id=sid||null;
   const d=S.draft;
   const gyms=settings().gyms||[];
@@ -1766,15 +2013,19 @@ function openStudentForm(sid){
         <div class="f"><label>Dia de vencimento</label><select id="sf-due">${Array.from({length:28},(_,i)=>`<option value="${i+1}" ${Number(d.dueDay)===i+1?'selected':''}>Dia ${i+1}</option>`).join('')}</select></div>
       </div>
       <div class="f2">
-        <div class="f"><label>Data de início</label><input id="sf-start" type="date" value="${esc(d.start||'')}"></div>
-        <div class="f"><label>Nascimento</label><input id="sf-birth" type="date" value="${esc(d.birth||'')}"></div>
+        ${dateField('sf-start','Data de início',d.start)}
+        ${dateField('sf-birth','Nascimento',d.birth)}
+      </div>
+      <div class="f2">
+        <div class="f"><label>Altura (cm)</label><input id="sf-height" type="number" min="80" max="230" inputmode="numeric" value="${esc(d.height||'')}" placeholder="Ex.: 172"><div class="hint">Usada para calcular o IMC.</div></div>
+        <div class="f"><label>Meta de peso (kg)</label><input id="sf-goalw" type="number" min="20" max="300" step="0.1" inputmode="decimal" value="${esc(d.goalWeight||'')}" placeholder="Opcional"></div>
       </div>
       <div class="f"><label>Duração da sessão</label><select id="sf-dur">
         <option value="">Padrão (${settings().dur} min)</option>
         ${[30,45,50,60,90].map(v=>`<option value="${v}" ${Number(d.dur)===v?'selected':''}>${v} minutos</option>`).join('')}
       </select></div>
       <div class="f"><label>Horários fixos na semana</label>
-        <div class="schedchips" id="sf-sched">${schedChipsHTML()}</div>
+        <div id="sf-sched" style="display:grid;gap:7px">${schedChipsHTML()}</div>
         <div class="row" style="margin-top:9px">
           <button type="button" class="btn sm ghost" data-a="sf-slots">${I.eye} Ver horários livres</button>
           <button type="button" class="btn sm ghost" data-a="sf-manual">${I.plus} Adicionar específico</button>
@@ -1809,10 +2060,24 @@ function schedChipsHTML(){
   const d=S.draft;
   if(!d)return'';
   if(!d.schedule.length)return'<span class="small muted">Nenhum horário ainda</span>';
-  return d.schedule.slice().sort((a,b)=>(a.d===0?7:a.d)-(b.d===0?7:b.d)||toMin(a.t)-toMin(b.t))
-    .map(x=>`<span class="schedchip">${WDS[x.d]} ${x.t}<button type="button" data-a="sf-rm" data-d="${x.d}" data-t="${x.t}" aria-label="remover">${I.x}</button></span>`).join('');
+  const sorted=d.schedule.slice().sort((a,b)=>(a.d===0?7:a.d)-(b.d===0?7:b.d)||toMin(a.t)-toMin(b.t));
+  return sorted.map(x=>`<div class="row" style="gap:8px">
+    <span class="schedchip" style="padding-right:11px;flex:none;min-width:96px;justify-content:center">${WDS[x.d]} ${x.t}</span>
+    <input data-sw-d="${x.d}" data-sw-t="${x.t}" value="${esc(x.w||'')}" placeholder="Treino do dia (ex.: Superior, Corrida…)"
+      style="flex:1;min-width:0;background:var(--surface);border:1.5px solid var(--line);border-radius:9px;padding:7px 10px;font-size:13px">
+    <button type="button" class="icon-btn" style="width:30px;height:30px" data-a="sf-rm" data-d="${x.d}" data-t="${x.t}" aria-label="remover">${I.x}</button>
+  </div>`).join('');
+}
+function syncSchedW(){
+  if(!S.draft)return;
+  $$('#sf-sched input[data-sw-d]').forEach(inp=>{
+    const e=S.draft.schedule.find(x=>x.d===Number(inp.dataset.swD)&&x.t===inp.dataset.swT);
+    if(e)e.w=inp.value.trim();
+  });
 }
 function refreshSchedChips(){ const el=$('#sf-sched'); if(el)el.innerHTML=schedChipsHTML(); }
+/* preserva o texto de treino digitado antes de re-renderizar as linhas */
+function refreshSchedRows(){ syncSchedW(); refreshSchedChips(); }
 function draftDur(){ const d=S.draft; return Number(d.dur)||Number(settings().dur)||60; }
 function syncDraftFields(){
   const d=S.draft;
@@ -1822,6 +2087,8 @@ function syncDraftFields(){
   d.start=g('sf-start'); d.birth=g('sf-birth');
   d.dur=g('sf-dur')?Number(g('sf-dur')):null; d.notes=g('sf-notes');
   d.gender=g('sf-gender'); d.plan=g('sf-plan')||'mensal'; d.gymId=g('sf-gym');
+  d.height=g('sf-height')?Number(g('sf-height')):''; d.goalWeight=g('sf-goalw')?Number(g('sf-goalw')):'';
+  syncSchedW();
 }
 function openSlotBrowser(){
   syncDraftFields();
@@ -1865,7 +2132,7 @@ function openSlotBrowser(){
       if(c){toast('Esse horário conflita com '+(c.self?'outro horário deste aluno':c.s.name)+'.','warn');return}
       S.draft.schedule.push({d:day,t});
     }
-    paint(); refreshSchedChips();
+    paint(); refreshSchedRows();
   });
 }
 function openManualSlot(){
@@ -1894,7 +2161,7 @@ function openManualSlot(){
     const c=conflictAt(day,t,draftDur(),S.draft.id,S.draft.schedule);
     if(c){$('#'+id+'-err').innerHTML=`<div class="f"><div class="err">Conflito: ${c.self?'este aluno já tem horário próximo':esc(c.s.name)+' às '+c.sc.t}.</div></div>`;return}
     S.draft.schedule.push({d:day,t});
-    closeLayer(); refreshSchedChips();
+    closeLayer(); refreshSchedRows();
     toast(WDS[day]+' '+t+' adicionado.');
   });
 }
@@ -1917,7 +2184,7 @@ function saveStudent(){
     dueDay:d.dueDay,birth:d.birth,start:d.start,notes:d.notes,active:d.active!==false,
     dur:d.dur,schedule:d.schedule,createdAt:(d.createdAt||todayISO()),
     gender:d.gender||'',plan:d.plan||'mensal',gymId:d.gymId||'',photo:d.photo||'',
-    packStart:d.packStart||''};
+    packStart:d.packStart||'',height:d.height||'',goalWeight:d.goalWeight||''};
   putDoc('students',id,body);
   closeAllLayers();
   toast(d.id?'Aluno atualizado ✓':d.name.split(' ')[0]+' cadastrado(a) ✓');
@@ -1948,24 +2215,40 @@ function deleteStudent(sid){
 
 /* ================= evals ================= */
 function openEvalForm(sid){
+  const s=stById(sid); if(!s)return;
   const id=uid('ev');
-  openLayer(`<div class="modal" role="dialog">
-    <div class="m-head"><h2>Registrar avaliação</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
+  const num=(lbl,fid,ph,step)=>`<div class="f"><label>${lbl}</label><input type="number" id="${id}-${fid}" min="0" step="${step||0.1}" inputmode="decimal" placeholder="${ph||''}"></div>`;
+  openLayer(`<div class="modal wide" role="dialog">
+    <div class="m-head"><h2>Nova avaliação — ${esc(firstName(s.name))}</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
     <div class="m-body">
-      <div class="f2">
-        <div class="f"><label>Data</label><input type="date" id="${id}-d" value="${todayISO()}"></div>
-        <div class="f"><label>Peso (kg) *</label><input type="number" id="${id}-w" min="20" max="400" step="0.1" inputmode="decimal" placeholder="00,0"></div>
-      </div>
-      <div class="f"><label>Anotação (opcional)</label><input id="${id}-n" placeholder="Ex.: medidas, % gordura, obs."></div>
+      <p class="small muted" style="margin-bottom:12px">Preencha só o que mediu — todo campo é opcional, menos a data e ao menos um valor.${s.height?' O IMC usa a altura de '+s.height+' cm do cadastro.':' Cadastre a altura do aluno para o IMC ser calculado.'}</p>
+      ${dateField(id+'-d','Data da avaliação',todayISO())}
+      <div class="eyebrow" style="margin:6px 0 8px">Composição corporal</div>
+      <div class="f2">${num('Peso (kg)','w','00,0')}${num('% de gordura','bf','00,0')}</div>
+      <div class="f2">${num('Massa magra (kg)','mm','00,0')}${num('Massa gorda (kg)','mg','00,0')}</div>
+      <div class="eyebrow" style="margin:6px 0 8px">Medidas (cm)</div>
+      <div class="f2">${num('Cintura','waist','')}${num('Quadril','hip','')}</div>
+      <div class="f2">${num('Braço','arm','')}${num('Coxa','thigh','')}</div>
+      <div class="f2">${num('Peitoral','chest','')}<div></div></div>
+      <div class="eyebrow" style="margin:6px 0 8px">Corrida (índice de performance)</div>
+      <div class="f2">${num('Distância (km)','rd','Ex.: 5')}${num('Tempo (min)','rt','Ex.: 30',1)}</div>
+      <p class="hint" style="color:var(--ink2);font-size:11.5px;margin-top:-6px;margin-bottom:10px">Ex.: 5 km em 30 min → ritmo 6:00/km. A evolução da marca aparece no gráfico.</p>
+      <div class="f"><label>Anotação (opcional)</label><input id="${id}-n" placeholder="Ex.: pós-férias, protocolo de dobras…"></div>
       <div id="${id}-err"></div>
     </div>
-    <div class="m-foot"><button class="btn soft" data-a="layer-close">Cancelar</button><button class="btn" id="${id}-ok">Salvar</button></div>
+    <div class="m-foot"><button class="btn soft" data-a="layer-close">Cancelar</button><button class="btn" id="${id}-ok">Salvar avaliação</button></div>
   </div>`);
   $('#'+id+'-ok').addEventListener('click',()=>{
-    const dt=$('#'+id+'-d').value, w=Number($('#'+id+'-w').value);
-    if(!dt||!w||w<=0){$('#'+id+'-err').innerHTML='<div class="f"><div class="err">Informe data e peso válidos.</div></div>';return}
+    const dt=$('#'+id+'-d').value;
+    const gv=f=>{const v=Number($('#'+id+'-'+f).value);return isFinite(v)&&v>0?v:null};
+    const e2={d:dt,note:$('#'+id+'-n').value.trim()};
+    const map={w:'w',bf:'bf',mm:'mm',mg:'mg',waist:'waist',hip:'hip',arm:'arm',thigh:'thigh',chest:'chest',rd:'runDist',rt:'runTime'};
+    let any=false;
+    for(const[f,k]of Object.entries(map)){const v=gv(f);if(v!=null){e2[k]=v;any=true}}
+    if(!dt||!any){$('#'+id+'-err').innerHTML='<div class="f"><div class="err">Informe a data e pelo menos um valor.</div></div>';return}
+    if((e2.runDist&&!e2.runTime)||(!e2.runDist&&e2.runTime)){$('#'+id+'-err').innerHTML='<div class="f"><div class="err">Para o índice de corrida, informe distância E tempo.</div></div>';return}
     const doc=clone(S.data.evals[sid]||{sid,entries:[]});
-    doc.entries.push({d:dt,w,note:$('#'+id+'-n').value.trim()});
+    doc.entries.push(e2);
     doc.entries.sort((a,b)=>a.d.localeCompare(b.d));
     putDoc('evals',sid,doc);
     closeLayer(); renderMain(); toast('Avaliação registrada ✓');
@@ -2019,6 +2302,7 @@ function finReceber(y,m){
         ?`<button class="btn sm soft" data-a="pay-toggle" data-sid="${s.id}" data-y="${y}" data-m="${m}">Desfazer</button>`
         :`<button class="btn sm" data-a="pay-open" data-sid="${s.id}" data-y="${y}" data-m="${m}">Receber</button>`):''}
       ${(ps.st==='atrasado'||ps.st==='pendente')&&cob?`<a class="icon-btn" href="${cob}" target="_blank" rel="noopener" title="Cobrar no WhatsApp (mensagem pronta)">${I.msg}</a>`:''}
+      ${ps.st==='pago'&&whatsHref(s.phone)?`<button class="icon-btn" data-a="wa-recibo" data-sid="${s.id}" data-y="${y}" data-m="${m}" title="Enviar recibo pelo WhatsApp">${I.msg}</button>`:''}
     </div>`}).join('')}</div>`
   :`<div class="empty">${I.cash}<div class="big">Nenhuma mensalidade neste modo</div>Alunos no plano “pacote” aparecem abaixo, em Pacotes vendidos.</div>`}</div>
   <div class="sec"><div class="eyebrow">Pacotes vendidos no mês</div>
@@ -2035,10 +2319,7 @@ function finReceber(y,m){
 }
 function waCobrancaHref(s,y,m){
   if(!whatsHref(s.phone))return null;
-  const txt=fillTemplate(settings().templates.cobranca,tplCtx(s,{
-    valor:brl(s.fee),mes:MON[m-1],vencimento:String(s.dueDay||5),
-  }));
-  return waMsgHref(s.phone,txt);
+  return waMsgHref(s.phone,waText('cobranca',s,{valor:brl(s.fee),mes:MON[m-1],vencimento:String(s.dueDay||5)}));
 }
 function finGastos(y,m){
   const ym=y+'-'+pad(m);
@@ -2090,11 +2371,21 @@ function finRelatorio(y,m){
   const cats=expByCat(y+'-'+pad(m));
   const reps=gymRepasse(y,m);
   const repTotal=reps.reduce((a,r)=>a+r.total,0);
-  return `<div class="tiles">
+  let aulas=0;
+  {const ym=y+'-'+pad(m);
+   for(const[idd,doc]of Object.entries(S.data.attendance)){
+     if(!idd.endsWith('_'+ym)||!doc.marks)continue;
+     for(const v of Object.values(doc.marks))if(v.s==='ok')aulas++;
+   }}
+  const porAula=aulas?cur.rec/aulas:null;
+  return `<div class="row between" style="margin-bottom:10px"><span></span>
+    <button class="btn sm ghost" data-a="csv-export" data-y="${y}" data-m="${m}">${I.dl} Exportar CSV do mês</button></div>
+  <div class="tiles">
     <div class="tile"><div class="l">Receita</div><div class="v big-num" style="font-size:17px;padding-top:6px;color:var(--ok)">${brl(cur.rec)}</div></div>
     <div class="tile"><div class="l">Gastos</div><div class="v big-num" style="font-size:17px;padding-top:6px;color:${cur.gas?'var(--bad)':'inherit'}">${brl(cur.gas)}</div></div>
     <div class="tile"><div class="l">Lucro</div><div class="v big-num" style="font-size:17px;padding-top:6px;color:${lucro>=0?'var(--ok)':'var(--bad)'}">${brl(lucro)}</div></div>
     <div class="tile"><div class="l">Repasse devido</div><div class="v big-num" style="font-size:17px;padding-top:6px">${brl(repTotal)}</div></div>
+    <div class="tile"><div class="l">Aulas dadas</div><div class="v big-num">${aulas}</div><div class="d">${porAula!=null?brl(porAula)+' por aula':''}</div></div>
   </div>
   <div class="sec"><div class="eyebrow">Receita × gastos — últimos 6 meses</div>
     <div class="card">
@@ -2162,6 +2453,10 @@ function openPackForm(sid){
   openLayer(`<div class="modal" role="dialog">
     <div class="m-head"><h2>Lançar pacote — ${esc(firstName(s.name))}</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
     <div class="m-body">
+      ${(st.packPresets||[]).length?`<div class="f"><label>Pacote pré-definido</label><select id="${id}-preset">
+        <option value="">Personalizado</option>
+        ${(st.packPresets||[]).map((p,i)=>`<option value="${i}">${p.qty} aulas — ${brl(p.price)}</option>`).join('')}
+      </select><div class="hint">Cadastre os seus em Mais → Pacotes e valores.</div></div>`:''}
       <div class="f2">
         <div class="f"><label>Quantidade de aulas *</label><select id="${id}-q">${[1,2,4,5,8,10,12,16,20,24,30].map(q=>`<option value="${q}" ${q===10?'selected':''}>${q} aulas</option>`).join('')}</select></div>
         <div class="f"><label>Valor total (R$) *</label><input id="${id}-v" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00"></div>
@@ -2177,6 +2472,18 @@ function openPackForm(sid){
     </div>
     <div class="m-foot"><button class="btn soft" data-a="layer-close">Cancelar</button><button class="btn" id="${id}-ok">Lançar pacote</button></div>
   </div>`);
+  const pre=$('#'+id+'-preset');
+  if(pre)pre.addEventListener('change',()=>{
+    if(pre.value==='')return; /* "Personalizado": não mexe nos campos */
+    const p=(settings().packPresets||[])[Number(pre.value)];
+    if(p){
+      const qEl=$('#'+id+'-q');
+      if(![...qEl.options].some(o=>Number(o.value)===Number(p.qty)))
+        qEl.insertAdjacentHTML('beforeend',`<option value="${Number(p.qty)}">${Number(p.qty)} aulas</option>`);
+      qEl.value=String(p.qty);
+      $('#'+id+'-v').value=p.price;
+    }
+  });
   $('#'+id+'-ok').addEventListener('click',()=>{
     const qty=Number($('#'+id+'-q').value), v=Number($('#'+id+'-v').value), dt=$('#'+id+'-d').value;
     if(!qty||!(v>=0)||!dt){$('#'+id+'-err').innerHTML='<div class="f"><div class="err">Informe quantidade, valor e data.</div></div>';return}
@@ -2317,21 +2624,25 @@ function openGymManager(){
     $('#'+id+'-n').value=''; $('#'+id+'-r').value=''; paint();
   });
   $('#'+id+'-ok').addEventListener('click',()=>{
-    putCfg('settings',{...settings(),gyms}); closeLayer(); renderMain(); toast('Academias salvas ✓');
+    putCfg('settings',{...settings(),gyms});
+    if(S.ui.gymF&&!gyms.some(g=>g.id===S.ui.gymF))S.ui.gymF='';
+    closeLayer(); renderMain(); toast('Academias salvas ✓');
   });
 }
 function openTplEditor(){
   const st=settings(), id=uid('tp');
   const defs=defTemplates();
   const rows=[
-    ['cobranca','Cobrança de mensalidade','{nome} {primeiro} {artigo} {valor} {mes} {vencimento}'],
-    ['cancel','Aviso de aula cancelada','{nome} {primeiro} {artigo} {data} {hora}'],
-    ['saldo','Saldo de aulas do pacote','{nome} {primeiro} {artigo} {saldo}'],
+    ['cobranca','Cobrança de mensalidade','{nome} {primeiro} {artigo} {valor} {mes} {vencimento} {pix} {personal}'],
+    ['cancel','Aviso de aula cancelada','{nome} {primeiro} {artigo} {data} {hora} {personal}'],
+    ['saldo','Saldo de aulas do pacote','{nome} {primeiro} {artigo} {saldo} {personal}'],
+    ['recibo','Recibo de pagamento','{nome} {primeiro} {valor} {forma} {mes} {personal}'],
+    ['parabens','Parabéns de aniversário','{nome} {primeiro} {artigo} {personal}'],
   ];
   openLayer(`<div class="modal wide" role="dialog">
     <div class="m-head"><h2>Mensagens do WhatsApp</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
     <div class="m-body">
-      <p class="small muted" style="margin-bottom:14px">Personalize os textos. As variáveis entre chaves são trocadas automaticamente pelos dados do aluno — <code style="background:var(--surface2);border-radius:4px;padding:1px 5px">{artigo}</code> vira “o” ou “a” conforme o tratamento do aluno.</p>
+      <p class="small muted" style="margin-bottom:14px">Personalize os textos. As variáveis entre chaves são trocadas automaticamente — <code style="background:var(--surface2);border-radius:4px;padding:1px 5px">{artigo}</code> vira “o” ou “a” conforme o tratamento do aluno, e <code style="background:var(--surface2);border-radius:4px;padding:1px 5px">{personal}</code> é o seu nome. Mensagens sem {personal} ganham a assinatura “Do seu Personal …” automaticamente no fim.</p>
       ${rows.map(([k,l,vars])=>`<div class="f"><label>${l}</label><textarea class="tpl" id="${id}-${k}">${esc(st.templates[k]||defs[k])}</textarea><div class="varchips">${vars.split(' ').map(v=>`<code>${v}</code>`).join('')}</div></div>`).join('')}
       <button class="btn ghost sm" id="${id}-def" style="border:none">Restaurar textos padrão</button>
     </div>
@@ -2347,6 +2658,229 @@ function openTplEditor(){
     closeLayer(); toast('Mensagens salvas ✓');
   });
 }
+function openThemePicker(){
+  const cur=Number(settings().theme)||0, id=uid('th');
+  openLayer(`<div class="modal" role="dialog">
+    <div class="m-head"><h2>Tema do app</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
+    <div class="m-body">
+      <p class="small muted" style="margin-bottom:12px">Escolha a cor da sua Prancheta — vale para o app inteiro, nos temas claro e escuro, em todos os seus aparelhos.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px">
+        ${THEMES.map(([n,h,s2],i)=>`<button data-a="theme-set" data-i="${i}"
+          style="display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:11px;border:2px solid ${i===cur?'var(--accent)':'var(--line)'};background:var(--surface);font-weight:700;font-size:12.5px">
+          <span style="width:22px;height:22px;border-radius:7px;background:hsl(${h},${s2}%,46%);flex:none;box-shadow:inset 0 -3px 0 rgba(0,0,0,.2)"></span>${n}</button>`).join('')}
+      </div>
+    </div>
+    <div class="m-foot"><button class="btn" data-a="layer-close">Concluído</button></div>
+  </div>`);
+}
+function openPlansManager(){
+  const st=settings(), id=uid('pn');
+  const plans=clone(st.plans||[]), promos=clone(st.promos||[]);
+  openLayer(`<div class="modal wide" role="dialog">
+    <div class="m-head"><h2>Planos e promoções</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
+    <div class="m-body">
+      <p class="small muted" style="margin-bottom:11px">Monte sua tabela de planos para enviar aos alunos pelo WhatsApp — na hora de enviar você escolhe quais planos entram e se as promoções vão junto.</p>
+      <div class="eyebrow" style="margin-bottom:7px">Planos</div>
+      <div class="mglist" id="${id}-pl"></div>
+      <div class="card" style="margin:10px 0 18px;padding:12px">
+        <div class="f"><label>Nome do plano</label><input id="${id}-n" placeholder="Ex.: 3x por semana"></div>
+        <div class="f2">
+          <div class="f"><label>Valor (R$/mês)</label><input id="${id}-v" type="number" min="0" step="0.01" inputmode="decimal"></div>
+          <div class="f"><label>Descrição (opcional)</label><input id="${id}-d2" placeholder="Ex.: inclui avaliação mensal"></div>
+        </div>
+        <button class="btn sm wide" id="${id}-addp">${I.plus} Adicionar plano</button>
+      </div>
+      <div class="eyebrow" style="margin-bottom:7px">Promoções e descontos</div>
+      <div class="mglist" id="${id}-pr"></div>
+      <div class="row" style="margin-top:10px"><input id="${id}-pt" class="grow" placeholder="Ex.: 10% off no plano trimestral até 30/09" style="background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px"><button class="btn sm" id="${id}-addr">${I.plus}</button></div>
+    </div>
+    <div class="m-foot"><button class="btn soft" data-a="layer-close">Cancelar</button><button class="btn" id="${id}-ok">Salvar</button></div>
+  </div>`);
+  const paint=()=>{
+    $('#'+id+'-pl').innerHTML=plans.length?plans.map((p,i)=>`<div class="mgrow"><span class="grow">${esc(p.name)} — <b>${brl(p.price)}</b>${p.desc?'<div class="small muted" style="font-weight:500">'+esc(p.desc)+'</div>':''}</span><button class="icon-btn" data-k="pl" data-i="${i}">${I.x}</button></div>`).join(''):'<p class="small muted">Nenhum plano ainda.</p>';
+    $('#'+id+'-pr').innerHTML=promos.length?promos.map((p,i)=>`<div class="mgrow"><span class="grow">🏷️ ${esc(p.text)}</span><button class="icon-btn" data-k="pr" data-i="${i}">${I.x}</button></div>`).join(''):'<p class="small muted">Nenhuma promoção ativa.</p>';
+  };
+  paint();
+  $('#'+id+'-pl').parentElement.addEventListener('click',e=>{
+    const b=e.target.closest('button[data-k]'); if(!b)return;
+    (b.dataset.k==='pl'?plans:promos).splice(Number(b.dataset.i),1); paint();
+  });
+  $('#'+id+'-addp').addEventListener('click',()=>{
+    const n=$('#'+id+'-n').value.trim(), v=Number($('#'+id+'-v').value);
+    if(!n||!(v>0)){toast('Informe nome e valor do plano.','warn');return}
+    plans.push({id:uid('pn'),name:n,price:v,desc:$('#'+id+'-d2').value.trim()});
+    $('#'+id+'-n').value='';$('#'+id+'-v').value='';$('#'+id+'-d2').value=''; paint();
+  });
+  $('#'+id+'-addr').addEventListener('click',()=>{
+    const t2=$('#'+id+'-pt').value.trim(); if(!t2)return;
+    promos.push({id:uid('pm'),text:t2}); $('#'+id+'-pt').value=''; paint();
+  });
+  $('#'+id+'-ok').addEventListener('click',()=>{
+    putCfg('settings',{...settings(),plans,promos});
+    closeLayer(); renderMain(); toast('Planos salvos ✓');
+  });
+}
+function openSendPlans(sid){
+  const s=stById(sid); if(!s)return;
+  const st=settings(), plans=st.plans||[], promos=st.promos||[];
+  if(!plans.length){toast('Cadastre seus planos primeiro em Mais → Planos e promoções.','warn');openPlansManager();return}
+  const id=uid('sp');
+  openLayer(`<div class="modal" role="dialog">
+    <div class="m-head"><h2>Enviar planos — ${esc(firstName(s.name))}</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
+    <div class="m-body">
+      <div class="eyebrow" style="margin-bottom:8px">Quais planos enviar?</div>
+      ${plans.map((p,i)=>`<label class="checkline" style="padding:6px 0"><input type="checkbox" data-pi="${i}" checked>${esc(p.name)} — ${brl(p.price)}</label>`).join('')}
+      ${promos.length?`<label class="checkline" style="padding:10px 0 4px;border-top:1px solid var(--line);margin-top:8px"><input type="checkbox" id="${id}-promo" checked><b>Incluir promoções</b> (${promos.length})</label>`:''}
+      <div class="f" style="margin-top:12px"><label>Prévia da mensagem</label><textarea class="tpl" id="${id}-tx" style="min-height:150px"></textarea></div>
+    </div>
+    <div class="m-foot"><button class="btn soft" data-a="layer-close">Cancelar</button><button class="btn" id="${id}-ok">${I.msg} Enviar no WhatsApp</button></div>
+  </div>`,{sheet:true});
+  const build=()=>{
+    const sel=[...$$('#overlay input[data-pi]')].filter(c=>c.checked).map(c=>plans[Number(c.dataset.pi)]);
+    const withPromo=$('#'+id+'-promo')?$('#'+id+'-promo').checked:false;
+    let txt='Olá, '+firstName(s.name)+'! 💪 Segue a minha tabela de planos:\n\n';
+    sel.forEach(p=>{txt+='• '+p.name+' — '+brl(p.price)+'/mês'+(p.desc?' ('+p.desc+')':'')+'\n'});
+    if(withPromo&&promos.length){txt+='\n🏷️ Promoções:\n';promos.forEach(p=>{txt+='• '+p.text+'\n'})}
+    txt+='\nQualquer dúvida me chama!\n\nDo seu Personal '+((S.data.profile||{}).name||'');
+    $('#'+id+'-tx').value=txt;
+  };
+  build();
+  $$('#overlay input[type="checkbox"]').forEach(c=>c.addEventListener('change',build));
+  $('#'+id+'-ok').addEventListener('click',()=>{
+    const href=waMsgHref(s.phone,$('#'+id+'-tx').value);
+    if(!href){toast('Este aluno não tem telefone cadastrado.','warn');return}
+    closeAllLayers(); window.open(href,'_blank','noopener');
+  });
+}
+function openPresetsManager(){
+  const st=settings(), id=uid('pp');
+  const list=clone(st.packPresets||[]);
+  openLayer(`<div class="modal" role="dialog">
+    <div class="m-head"><h2>Pacotes e valores</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
+    <div class="m-body">
+      <p class="small muted" style="margin-bottom:11px">Defina os pacotes que você vende — na hora de lançar para um aluno, é só escolher.</p>
+      <div class="mglist" id="${id}-l"></div>
+      <div class="row" style="margin-top:12px">
+        <input id="${id}-q" type="number" min="1" placeholder="Aulas" style="width:84px;background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:9px 10px;font-size:14px">
+        <input id="${id}-v" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Valor (R$)" class="grow" style="min-width:0;background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px">
+        <button class="btn sm" id="${id}-add">${I.plus}</button>
+      </div>
+    </div>
+    <div class="m-foot"><button class="btn soft" data-a="layer-close">Cancelar</button><button class="btn" id="${id}-ok">Salvar</button></div>
+  </div>`);
+  const paint=()=>{$('#'+id+'-l').innerHTML=list.length?list.map((p,i)=>`<div class="mgrow"><span class="grow">📦 <b>${p.qty} aulas</b> — ${brl(p.price)} <span class="small muted">(${brl(p.price/p.qty)}/aula)</span></span><button class="icon-btn" data-i="${i}">${I.x}</button></div>`).join(''):'<p class="small muted">Nenhum pacote definido.</p>'};
+  paint();
+  $('#'+id+'-l').addEventListener('click',e=>{
+    const b=e.target.closest('button[data-i]'); if(!b)return;
+    list.splice(Number(b.dataset.i),1); paint();
+  });
+  $('#'+id+'-add').addEventListener('click',()=>{
+    const q=Number($('#'+id+'-q').value), v=Number($('#'+id+'-v').value);
+    if(!(q>0)||!(v>0)){toast('Informe aulas e valor.','warn');return}
+    list.push({id:uid('pp'),qty:q,price:v});
+    list.sort((a,b)=>a.qty-b.qty);
+    $('#'+id+'-q').value='';$('#'+id+'-v').value=''; paint();
+  });
+  $('#'+id+'-ok').addEventListener('click',()=>{
+    putCfg('settings',{...settings(),packPresets:list});
+    closeLayer(); renderMain(); toast('Pacotes salvos ✓');
+  });
+}
+function openFilesManager(){
+  const st=settings(), id=uid('fl');
+  const list=clone(st.files||[]);
+  openLayer(`<div class="modal" role="dialog">
+    <div class="m-head"><h2>Arquivos e links</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
+    <div class="m-body">
+      <p class="small muted" style="margin-bottom:11px">Guarde os links que você envia sempre: cartão virtual em PDF, cópia do CREF, contrato… Hospede o arquivo no Google Drive (ou similar), cole o link aqui e envie pelo WhatsApp com um toque.</p>
+      <div class="mglist" id="${id}-l"></div>
+      <div class="card" style="margin-top:12px;padding:12px">
+        <div class="f"><label>Nome</label><input id="${id}-n" placeholder="Ex.: Cartão virtual (PDF)"></div>
+        <div class="f"><label>Link</label><input id="${id}-u" type="url" inputmode="url" placeholder="https://…"></div>
+        <button class="btn sm wide" id="${id}-add">${I.plus} Adicionar</button>
+      </div>
+    </div>
+    <div class="m-foot"><button class="btn soft" data-a="layer-close">Cancelar</button><button class="btn" id="${id}-ok">Salvar</button></div>
+  </div>`);
+  const paint=()=>{$('#'+id+'-l').innerHTML=list.length?list.map((f,i)=>`<div class="mgrow"><span class="grow">📎 ${esc(f.name)}<div class="small muted" style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:230px">${esc(f.url)}</div></span><button class="icon-btn" data-i="${i}">${I.x}</button></div>`).join(''):'<p class="small muted">Nenhum arquivo/link salvo.</p>'};
+  paint();
+  $('#'+id+'-l').addEventListener('click',e=>{
+    const b=e.target.closest('button[data-i]'); if(!b)return;
+    list.splice(Number(b.dataset.i),1); paint();
+  });
+  $('#'+id+'-add').addEventListener('click',()=>{
+    const n=$('#'+id+'-n').value.trim(); let u=$('#'+id+'-u').value.trim();
+    if(!n||!u){toast('Informe nome e link.','warn');return}
+    if(!/^https?:\/\//i.test(u))u='https://'+u;
+    list.push({id:uid('fl'),name:n,url:u});
+    $('#'+id+'-n').value='';$('#'+id+'-u').value=''; paint();
+  });
+  $('#'+id+'-ok').addEventListener('click',()=>{
+    putCfg('settings',{...settings(),files:list});
+    closeLayer(); renderMain(); toast('Arquivos salvos ✓');
+  });
+}
+function openSendFile(){
+  const st=settings(), files=st.files||[];
+  if(!files.length){openFilesManager();return}
+  const alunos=activeStudents().filter(s=>whatsHref(s.phone)).sort((a,b)=>a.name.localeCompare(b.name));
+  const id=uid('sf2');
+  openLayer(`<div class="modal" role="dialog">
+    <div class="m-head"><h2>Enviar arquivo/link</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
+    <div class="m-body">
+      <div class="f"><label>Arquivo</label><select id="${id}-f">${files.map((f,i)=>`<option value="${i}">${esc(f.name)}</option>`).join('')}</select></div>
+      ${alunos.length?`<div class="f"><label>Enviar para</label><select id="${id}-s">${alunos.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></div>`
+        :'<p class="small" style="color:var(--warn);font-weight:600;margin-bottom:12px">Nenhum aluno ativo com telefone cadastrado — cadastre o WhatsApp dos alunos para enviar, ou use “Copiar só o link”.</p>'}
+      <button class="btn ghost sm" id="${id}-cp" style="border:none">Copiar só o link</button>
+      <button class="btn ghost sm" data-a="mg-files" style="border:none">Gerenciar arquivos</button>
+    </div>
+    <div class="m-foot"><button class="btn soft" data-a="layer-close">Cancelar</button><button class="btn" id="${id}-ok">${I.msg} Enviar no WhatsApp</button></div>
+  </div>`,{sheet:true});
+  $('#'+id+'-cp').addEventListener('click',async()=>{
+    const f=files[Number($('#'+id+'-f').value)];
+    try{await navigator.clipboard.writeText(f.url);toast('Link copiado ✓')}catch(e){toast(f.url)}
+  });
+  $('#'+id+'-ok').addEventListener('click',()=>{
+    const f=files[Number($('#'+id+'-f').value)];
+    const sSel=$('#'+id+'-s');
+    if(!sSel){toast('Cadastre o telefone de um aluno para enviar pelo WhatsApp.','warn');return}
+    const s=stById(sSel.value);
+    if(!f||!s)return;
+    const txt='Olá, '+firstName(s.name)+'! Segue '+f.name+':\n'+f.url+'\n\nDo seu Personal '+((S.data.profile||{}).name||'');
+    const href=waMsgHref(s.phone,txt);
+    closeAllLayers(); if(href)window.open(href,'_blank','noopener');
+  });
+}
+async function exportCSV(y,m){
+  const ym=y+'-'+pad(m);
+  const sep=';', lines=['tipo'+sep+'data'+sep+'descricao'+sep+'categoria/forma'+sep+'valor'];
+  const csvNum=v=>String((Number(v)||0).toFixed(2)).replace('.',',');
+  const q=s2=>'"'+String(s2||'').replace(/"/g,'""')+'"';
+  for(const s of students()){
+    const rec=(payDoc(s.id,y).months||{})[String(m)];
+    if(rec)lines.push(['receita',rec.at,q('Mensalidade '+s.name),q(rec.via||''),csvNum(rec.amount||s.fee)].join(sep));
+  }
+  for(const p of Object.values(S.data.packs))
+    if((p.at||'').slice(0,7)===ym){const s=stById(p.sid);lines.push(['receita',p.at,q('Pacote '+(p.qty)+' aulas '+(s?s.name:'')),q(p.via||''),csvNum(p.value)].join(sep))}
+  for(const e2 of monthExpenses(ym))
+    lines.push(['gasto',e2.d,q(e2.note||e2.cat),q(e2.cat),csvNum(-(Number(e2.v)||0))].join(sep));
+  const csv='﻿'+lines.join('\r\n');
+  let dl=null;
+  try{ if(window.claude&&window.claude.use)dl=await window.claude.use('downloads'); }catch(e){}
+  if(dl){
+    try{ await dl.save({filename:'prancheta-financeiro-'+ym+'.csv',data:csv}); toast('CSV exportado ✓'); return; }
+    catch(e){ if(e&&(e.code==='declined'||e.code==='rate_limited'))return; }
+  }
+  try{
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+    a.download='prancheta-financeiro-'+ym+'.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    toast('CSV baixado ✓');
+  }catch(e){
+    try{await navigator.clipboard.writeText(csv);toast('CSV copiado para a área de transferência ✓')}catch(e2){toast('Não foi possível exportar.','bad')}
+  }
+}
 function openNotifPrefs(){
   const st=settings(), id=uid('nt');
   const perm=canNotify()?Notification.permission:'unsupported';
@@ -2357,17 +2891,25 @@ function openNotifPrefs(){
         <select id="${id}-m">${[[0,'Desligado'],[10,'10 minutos antes'],[15,'15 minutos antes'],[30,'30 minutos antes'],[60,'1 hora antes']].map(([v,l])=>`<option value="${v}" ${Number(st.remindMin)===v?'selected':''}>${l}</option>`).join('')}</select></div>
       <div class="f"><label>Alerta de pacote acabando</label>
         <select id="${id}-p">${[1,2,3,4,5].map(v=>`<option value="${v}" ${Number(st.packWarn)===v?'selected':''}>Com ${v} aula(s) restantes</option>`).join('')}</select></div>
-      <div class="card" style="padding:12px;margin-top:4px">
+      <div class="f"><label>Bloqueio automático por inatividade</label>
+        <select id="${id}-al">${[[0,'Desligado'],[5,'Após 5 minutos'],[15,'Após 15 minutos'],[30,'Após 30 minutos']].map(([v,l])=>`<option value="${v}" ${Number(st.autoLock)===v?'selected':''}>${l}</option>`).join('')}</select></div>
+      ${(()=>{
+        const android=/Android/i.test(navigator.userAgent);
+        const sysOk=perm==='granted'&&(SW||!android);
+        const pill=perm==='granted'?(sysOk?['ok','Ativadas']:['warn','Só dentro do app']):perm==='denied'?['bad','Bloqueadas']:perm==='unsupported'?['mut','Indisponível']:['mut','Não ativadas'];
+        return`<div class="card" style="padding:12px;margin-top:4px">
         <div class="row"><span class="grow" style="font-size:13.5px;font-weight:600">Notificações do navegador</span>
-          <span class="pill ${perm==='granted'?'ok':perm==='denied'?'bad':'mut'}">${perm==='granted'?'Ativadas':perm==='denied'?'Bloqueadas':perm==='unsupported'?'Indisponível':'Não ativadas'}</span></div>
+          <span class="pill ${pill[0]}">${pill[1]}</span></div>
         ${perm==='default'?`<button class="btn sm wide" data-a="notif-ask" style="margin-top:9px">${I.bell} Ativar notificações</button>`:''}
-        <p class="hint" style="margin-top:8px;color:var(--ink2);font-size:11.5px">Os avisos tocam com o app aberto (vale a aba em segundo plano). ${perm==='denied'?'Para reativar, ajuste as permissões do site no navegador.':''}</p>
-      </div>
+        <p class="hint" style="margin-top:8px;color:var(--ink2);font-size:11.5px">Os avisos tocam com o app aberto (vale a aba em segundo plano).
+        ${perm==='denied'?' Para reativar, ajuste as permissões do site no navegador.':''}
+        ${perm==='granted'&&!sysOk?' Neste ambiente o Android não mostra notificações do sistema — os avisos aparecem dentro do app. Pelo link do site (jcgoliver21.github.io/prancheta) elas funcionam e o app pode ser instalado na tela inicial.':''}</p>
+      </div>`})()}
     </div>
     <div class="m-foot"><button class="btn soft" data-a="layer-close">Cancelar</button><button class="btn" id="${id}-ok">Salvar</button></div>
   </div>`);
   $('#'+id+'-ok').addEventListener('click',()=>{
-    putCfg('settings',{...settings(),remindMin:Number($('#'+id+'-m').value),packWarn:Number($('#'+id+'-p').value)});
+    putCfg('settings',{...settings(),remindMin:Number($('#'+id+'-m').value),packWarn:Number($('#'+id+'-p').value),autoLock:Number($('#'+id+'-al').value)});
     closeLayer(); renderMain(); toast('Preferências salvas ✓');
   });
 }
@@ -2384,7 +2926,13 @@ function vMais(){
       <div class="row" style="gap:6px;margin-top:5px;flex-wrap:wrap">
         ${p.cref?`<span class="pill acc">CREF ${esc(p.cref)}</span>`:''}
         <span class="pill ${S.syncDead?'bad':S.cloud?'ok':'warn'}">${S.syncDead?'Sincronização interrompida — recarregue':S.cloud?'☁ Nuvem sincronizada':'Somente neste aparelho'}</span>
-      </div></div>
+      </div>
+      ${(p.instagram||p.facebook||p.youtube||p.pixKey)?`<div class="row" style="gap:6px;margin-top:7px;flex-wrap:wrap">
+        ${p.instagram?`<a class="pill mut" href="${esc(/^https?:/i.test(p.instagram)?p.instagram:'https://instagram.com/'+p.instagram.replace(/^@/,''))}" target="_blank" rel="noopener">Instagram</a>`:''}
+        ${p.facebook?`<a class="pill mut" href="${esc(/^https?:/i.test(p.facebook)?p.facebook:'https://facebook.com/'+p.facebook)}" target="_blank" rel="noopener">Facebook</a>`:''}
+        ${p.youtube?`<a class="pill mut" href="${esc(/^https?:/i.test(p.youtube)?p.youtube:'https://youtube.com/'+p.youtube)}" target="_blank" rel="noopener">YouTube</a>`:''}
+        ${p.pixKey?`<button class="pill acc" data-a="copy-pix" style="cursor:pointer">Copiar Pix</button>`:''}
+      </div>`:''}</div>
     <button class="icon-btn" data-a="prof-edit" title="Editar perfil">${I.edit}</button>
   </div></div>
   ${S.cloud?'':`<div class="banner" style="margin-top:12px">${I.warn.replace('<svg','<svg width="18" height="18"')} Os dados ficam salvos neste navegador. Para levar para outro aparelho, use Exportar/Importar backup em “Dados”, logo abaixo.</div>`}
@@ -2394,7 +2942,11 @@ function vMais(){
     <div class="cfgrow"><span class="lead">${I.users}</span><span class="grow"><div class="t">Ocupação da agenda</div><div class="d">${Math.round(occ.booked/60)}h ocupadas de ${Math.round(occ.avail/60)}h disponíveis por semana</div><div class="bar" style="margin-top:6px;max-width:220px"><i class="acc" style="width:${occ.pct}%"></i></div></span><b class="mono">${occ.pct}%</b></div>
   </div></div>
   <div class="sec"><div class="eyebrow">Trabalho</div><div class="card" style="padding:4px 16px">
-    <button class="cfgrow" data-a="tpl-edit"><span class="lead">${I.msg}</span><span class="grow"><div class="t">Mensagens do WhatsApp</div><div class="d">Cobrança, cancelamento e saldo de aulas — com variáveis</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
+    <button class="cfgrow" data-a="theme-pick"><span class="lead" style="background:var(--btn);color:var(--on-btn)">${I.sun}</span><span class="grow"><div class="t">Tema do app</div><div class="d">${esc((THEMES[Number(st.theme)||0]||THEMES[0])[0])} · 20 cores disponíveis</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
+    <button class="cfgrow" data-a="mg-plans"><span class="lead">${I.cash}</span><span class="grow"><div class="t">Planos e promoções</div><div class="d">${(st.plans||[]).length?(st.plans||[]).length+' plano(s)'+((st.promos||[]).length?' · '+(st.promos||[]).length+' promoção(ões)':''):'Monte sua tabela para enviar aos alunos'}</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
+    <button class="cfgrow" data-a="mg-presets"><span class="lead">${I.box}</span><span class="grow"><div class="t">Pacotes e valores</div><div class="d">${(st.packPresets||[]).length?(st.packPresets||[]).map(p=>p.qty+' aulas '+brl(p.price)).join(' · '):'Defina os pacotes que você vende'}</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
+    <button class="cfgrow" data-a="send-file"><span class="lead">${I.dl}</span><span class="grow"><div class="t">Arquivos e links</div><div class="d">${(st.files||[]).length?(st.files||[]).map(f=>esc(f.name)).join(' · '):'Cartão virtual, CREF, contrato — para enviar com 1 toque'}</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
+    <button class="cfgrow" data-a="tpl-edit"><span class="lead">${I.msg}</span><span class="grow"><div class="t">Mensagens do WhatsApp</div><div class="d">Cobrança, cancelamento, saldo, recibo e parabéns — assinadas por você</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
     <button class="cfgrow" data-a="notif-prefs"><span class="lead">${I.bell}</span><span class="grow"><div class="t">Notificações e lembretes</div><div class="d">${Number(st.remindMin)>0?'Aviso '+st.remindMin+' min antes do treino':'Aviso de treino desligado'} · pacote com ${st.packWarn} aula(s)</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
     <button class="cfgrow" data-a="mg-gyms"><span class="lead">${I.bldg}</span><span class="grow"><div class="t">Academias e repasse</div><div class="d">${(st.gyms||[]).length?(st.gyms||[]).map(g=>esc(g.name)).join(', '):'Nenhuma academia cadastrada'}</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
     <button class="cfgrow" data-a="mg-methods"><span class="lead">${I.wallet}</span><span class="grow"><div class="t">Formas de recebimento</div><div class="d">${(st.payMethods||[]).map(esc).join(', ')}</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
@@ -2423,8 +2975,17 @@ function openProfileForm(){
         ${photo?`<button class="btn sm ghost" id="${id}-rm" style="margin-top:6px;border:none;color:var(--bad)">Remover foto</button>`:''}</div>
       </div>
       <div class="f"><label>Nome completo *</label><input id="${id}-n" value="${esc(p.name)}"></div>
-      <div class="f"><label>CREF</label><input id="${id}-c" value="${esc(p.cref||'')}" placeholder="000000-G/UF"></div>
+      <div class="f2">
+        <div class="f"><label>CREF</label><input id="${id}-c" value="${esc(p.cref||'')}" placeholder="000000-G/UF"></div>
+        <div class="f"><label>Chave Pix</label><input id="${id}-px" value="${esc(p.pixKey||'')}" placeholder="CPF, celular, e-mail…"><div class="hint">Use {pix} nas mensagens de cobrança.</div></div>
+      </div>
       <div class="f"><label>E-mail *</label><input id="${id}-e" type="email" value="${esc(p.email||'')}"></div>
+      <div class="eyebrow" style="margin:6px 0 8px">Redes sociais</div>
+      <div class="f"><label>Instagram</label><input id="${id}-ig" value="${esc(p.instagram||'')}" placeholder="@seuperfil ou link"></div>
+      <div class="f2">
+        <div class="f"><label>Facebook</label><input id="${id}-fb" value="${esc(p.facebook||'')}" placeholder="link do perfil"></div>
+        <div class="f"><label>YouTube</label><input id="${id}-yt" value="${esc(p.youtube||'')}" placeholder="link do canal"></div>
+      </div>
       <div id="${id}-err"></div>
     </div>
     <div class="m-foot"><button class="btn soft" data-a="layer-close">Cancelar</button><button class="btn" id="${id}-ok">Salvar</button></div>
@@ -2437,7 +2998,9 @@ function openProfileForm(){
   $('#'+id+'-ok').addEventListener('click',()=>{
     const n=$('#'+id+'-n').value.trim(), e2=$('#'+id+'-e').value.trim();
     if(!n||!/.+@.+\..+/.test(e2)){$('#'+id+'-err').innerHTML='<div class="f"><div class="err">Informe nome e um e-mail válido.</div></div>';return}
-    putCfg('profile',{...p,name:n,cref:$('#'+id+'-c').value.trim(),email:e2,photo});
+    putCfg('profile',{...p,name:n,cref:$('#'+id+'-c').value.trim(),email:e2,photo,
+      pixKey:$('#'+id+'-px').value.trim(),instagram:$('#'+id+'-ig').value.trim(),
+      facebook:$('#'+id+'-fb').value.trim(),youtube:$('#'+id+'-yt').value.trim()});
     closeLayer(); renderMain(); toast('Perfil atualizado ✓');
   });
 }
@@ -2643,6 +3206,8 @@ const A={
   'sf-slots':()=>openSlotBrowser(),
   'sf-manual':()=>openManualSlot(),
   'sf-rm':el=>{
+    if(!S.draft)return;
+    syncSchedW();
     const d=Number(el.dataset.d), t=el.dataset.t;
     const i=S.draft.schedule.findIndex(x=>x.d===d&&x.t===t);
     if(i>=0)S.draft.schedule.splice(i,1);
@@ -2758,6 +3323,24 @@ const A={
   },
   'notif-prefs':()=>openNotifPrefs(),
   'tpl-edit':()=>openTplEditor(),
+  'theme-pick':()=>openThemePicker(),
+  'theme-set':el=>{
+    const i=Number(el.dataset.i)||0;
+    putCfg('settings',{...settings(),theme:i});
+    applyTheme(i);
+    closeAllLayers(); openThemePicker(); renderMain();
+    toast('Tema '+THEMES[i][0]+' aplicado ✓');
+  },
+  'mg-plans':()=>openPlansManager(),
+  'send-plans':el=>openSendPlans(el.dataset.sid),
+  'mg-presets':()=>openPresetsManager(),
+  'mg-files':()=>{closeAllLayers();openFilesManager()},
+  'send-file':()=>openSendFile(),
+  'csv-export':el=>exportCSV(Number(el.dataset.y),Number(el.dataset.m)),
+  'copy-pix':async()=>{
+    const k=(S.data.profile||{}).pixKey||'';
+    try{await navigator.clipboard.writeText(k);toast('Chave Pix copiada ✓')}catch(e){toast(k)}
+  },
   'mg-methods':()=>openListManager({title:'Formas de recebimento',
     hint:'Como seus alunos pagam: Pix, dinheiro, Nubank, Mercado Pago… Aparecem na hora de registrar um recebimento.',
     items:settings().payMethods||[],onSave:l=>putCfg('settings',{...settings(),payMethods:l})}),
@@ -2768,15 +3351,38 @@ const A={
   'wa-saldo':el=>{
     const s=stById(el.dataset.sid); if(!s)return;
     const pi=packInfo(s.id);
-    const href=waMsgHref(s.phone,fillTemplate(settings().templates.saldo,tplCtx(s,{saldo:String(Math.max(0,pi.left))})));
+    const href=waMsgHref(s.phone,waText('saldo',s,{saldo:String(Math.max(0,pi.left))}));
     if(href)window.open(href,'_blank','noopener');
+  },
+  'wa-parabens':el=>{
+    const s=stById(el.dataset.sid); if(!s)return;
+    const href=waMsgHref(s.phone,waText('parabens',s,{}));
+    if(href)window.open(href,'_blank','noopener');
+  },
+  'wa-recibo':el=>{
+    const s=stById(el.dataset.sid); if(!s)return;
+    const y=Number(el.dataset.y), m=Number(el.dataset.m);
+    const rec=(payDoc(s.id,y).months||{})[String(m)]; if(!rec)return;
+    const href=waMsgHref(s.phone,waText('recibo',s,{valor:brl(Number(rec.amount)||s.fee),forma:rec.via||'—',mes:MON[m-1]}));
+    if(href)window.open(href,'_blank','noopener');
+  },
+  'sess-note':el=>{
+    const inp=$('#sess-note-in'); if(!inp)return;
+    const{sid,iso,time}=el.dataset;
+    setMarkNote(sid,iso,time,inp.value.trim());
+    toast('Anotação salva ✓');
+  },
+  'eval-metric':el=>{S.ui.evalMetric=el.dataset.m;renderMain()},
+  'datepick':el=>{
+    const inp=document.getElementById(el.dataset.for); if(!inp)return;
+    openDatePicker(inp.value,iso=>{inp.value=iso;inp.dispatchEvent(new Event('change',{bubbles:true}))});
   },
   'sess-cancel-wa':el=>{
     const{iso,sid,time}=el.dataset;
     const s=stById(sid); if(!s)return;
     setMark(sid,iso,time,null);
     addExc({type:'cancel',date:iso,sid,time});
-    const href=waMsgHref(s.phone,fillTemplate(settings().templates.cancel,tplCtx(s,{data:fmtDM(iso),hora:time})));
+    const href=waMsgHref(s.phone,waText('cancel',s,{data:fmtDM(iso),hora:time}));
     closeAllLayers(); renderMain(); toast('Sessão cancelada — abrindo o WhatsApp…');
     if(href)window.open(href,'_blank','noopener');
   },
