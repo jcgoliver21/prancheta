@@ -13,6 +13,7 @@
   --accent:#2447E0; --btn:#2447E0; --btn-h:#1B37B8; --on-btn:#FFFFFF; --accent-soft:#E4E9FC;
   --ok:#0B8F5E; --ok-soft:#DCF3E9; --warn:#B96E00; --warn-soft:#F8ECD9; --bad:#D23B2E; --bad-soft:#FAE3E0;
   --on-ok:#FFFFFF; --on-bad:#FFFFFF;
+  --ch1:#2447E0; --ch2:#D97706;
   --shadow:0 1px 2px rgba(16,24,40,.05),0 8px 24px rgba(16,24,40,.07);
   --shadow-lg:0 12px 40px rgba(16,24,40,.18);
   --r:12px; --rs:8px;
@@ -25,6 +26,7 @@
     --accent:#8FA3FF; --btn:#3D5BFF; --btn-h:#5A74FF; --on-btn:#FFFFFF; --accent-soft:#212C4E;
     --ok:#45CE93; --ok-soft:#12352A; --warn:#E8A23D; --warn-soft:#33260F; --bad:#F87168; --bad-soft:#3B1815;
     --on-ok:#07130D; --on-bad:#230605;
+    --ch1:#6B84F5; --ch2:#BD7E1F;
     --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
     --shadow-lg:0 12px 40px rgba(0,0,0,.5);
     --grid-line:#222C38;
@@ -36,6 +38,7 @@
   --accent:#8FA3FF; --btn:#3D5BFF; --btn-h:#5A74FF; --on-btn:#FFFFFF; --accent-soft:#212C4E;
   --ok:#45CE93; --ok-soft:#12352A; --warn:#E8A23D; --warn-soft:#33260F; --bad:#F87168; --bad-soft:#3B1815;
   --on-ok:#07130D; --on-bad:#230605;
+  --ch1:#6B84F5; --ch2:#BD7E1F;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
   --shadow-lg:0 12px 40px rgba(0,0,0,.5);
   --grid-line:#222C38;
@@ -147,7 +150,8 @@ svg{display:block}
 .pill.mut{background:var(--surface2);color:var(--ink2)}
 .pill.acc{background:var(--accent-soft);color:var(--accent)}
 
-.avatar{border-radius:10px;display:grid;place-items:center;color:#fff;font-weight:800;flex:none;text-transform:uppercase;box-shadow:inset 0 -3px 0 rgba(0,0,0,.15)}
+.avatar{border-radius:10px;display:grid;place-items:center;color:#fff;font-weight:800;flex:none;text-transform:uppercase;box-shadow:inset 0 -3px 0 rgba(0,0,0,.15);position:relative;overflow:hidden}
+.avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .avatar.s28{width:28px;height:28px;font-size:11px;border-radius:8px}
 .avatar.s40{width:40px;height:40px;font-size:15px}
 .avatar.s56{width:56px;height:56px;font-size:21px;border-radius:14px}
@@ -334,6 +338,39 @@ svg{display:block}
 /* banner */
 .banner{display:flex;align-items:center;gap:11px;background:var(--accent-soft);color:var(--accent);border-radius:var(--r);padding:11px 14px;font-weight:600;font-size:13.5px}
 .banner.okb{background:var(--ok-soft);color:var(--ok)}
+.banner.warnb{background:var(--warn-soft);color:var(--warn)}
+
+/* charts (relatórios) */
+.legend{display:flex;gap:16px;font-size:12px;color:var(--ink2);font-weight:600;margin-bottom:10px}
+.legend i{width:9px;height:9px;border-radius:3px;display:inline-block;margin-right:6px;vertical-align:-.5px}
+.gbars{overflow-x:auto}
+.gbars svg{width:100%;min-width:300px;height:auto;display:block}
+.gbars text{font-family:"Archivo",sans-serif;font-variant-numeric:tabular-nums}
+.hbars{display:grid;gap:8px}
+.hbars .r{display:grid;grid-template-columns:minmax(84px,120px) 1fr auto;gap:10px;align-items:center;font-size:12.5px}
+.hbars .lb{color:var(--ink2);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hbars .tr{height:14px;background:var(--surface2);border-radius:4px;overflow:hidden}
+.hbars .fl{height:100%;border-radius:0 4px 4px 0;background:var(--ch1);min-width:2px}
+.hbars .fl.g{background:var(--ch2)}
+.hbars .vl{font-weight:700;font-variant-numeric:tabular-nums;font-size:12px}
+
+/* photo picker */
+.photopick{width:76px;height:76px;border-radius:20px;border:2px dashed var(--line);background:var(--surface2);display:grid;place-items:center;color:var(--ink2);cursor:pointer;position:relative;overflow:hidden;flex:none}
+.photopick img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.photopick svg{width:24px;height:24px}
+.photopick .rm{position:absolute;right:2px;top:2px;width:20px;height:20px;border-radius:6px;background:rgba(0,0,0,.55);color:#fff;display:grid;place-items:center;z-index:2}
+.photopick .rm svg{width:11px;height:11px}
+
+/* templates */
+.f textarea.tpl{font-size:13px;min-height:92px;font-family:inherit}
+.varchips{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px}
+.varchips code{font-size:11px;background:var(--surface2);border-radius:5px;padding:2px 7px;color:var(--ink2)}
+
+/* manage lists (methods, categories, gyms) */
+.mglist{display:grid;gap:7px}
+.mgrow{display:flex;align-items:center;gap:10px;background:var(--surface2);border-radius:9px;padding:8px 8px 8px 13px;font-weight:600;font-size:13.5px}
+.mgrow .icon-btn{width:28px;height:28px}
+.mgrow .icon-btn svg{width:14px;height:14px}
 
 /* toasts */
 #toasts{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(86px + env(safe-area-inset-bottom,0px));z-index:80;display:grid;gap:8px;justify-items:center;width:min(92vw,420px);pointer-events:none}
@@ -462,28 +499,56 @@ const I={
   user:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c1-3.8 4-5.7 7.5-5.7s6.5 1.9 7.5 5.7"/></svg>',
   cake:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16M5 20v-7h14v7M8 13v-3M12 13V9M16 13v-3M8 7.5V6M12 6V4.5M16 7.5V6"/></svg>',
   warn:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 1.8 20.5h20.4zM12 10v4M12 17.5v.1"/></svg>',
+  cam:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6H8l1.5-2h5L16 6h2.5A2.5 2.5 0 0 1 21 8.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+  bell:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5a6 6 0 0 1 12 0c0 4 1.5 5.5 2.5 6.5H3.5C4.5 15 6 13.5 6 9.5M10 19.5a2 2 0 0 0 4 0"/></svg>',
+  box:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3.5 7.5v9L12 21l8.5-4.5v-9zM3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg>',
+  chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4v16h16M9 16v-5M13.5 16V8M18 16v-3"/></svg>',
+  bldg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V5.5L12 3v18M12 8l8 2.5V21M4 21h16M7.5 8h1M7.5 11.5h1M7.5 15h1M15.5 13h1M15.5 16.5h1"/></svg>',
+  msg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.6L3 21l1.9-5.6A8.5 8.5 0 1 1 21 11.5z"/></svg>',
+  wallet:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="14" rx="2.5"/><path d="M3 9.5h18M16.5 14.5h.1"/></svg>',
+  fuel:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3.5 21h13M15 9h2.5a2 2 0 0 1 2 2v6a1.5 1.5 0 0 0 3 0V9.5L19 6M8 7h4"/></svg>',
 };
 
 /* ================= state ================= */
 const KEY='prancheta-v1', TKEY='prancheta-unlock', KKEY='prancheta-keep';
+const COLLS=['students','attendance','payments','exceptions','evals','packs','expenses','reminders'];
 const S={
   mode:'loading', db:null, cloud:false, booted:false,
-  data:{profile:null,settings:null,students:{},attendance:{},payments:{},exceptions:{},evals:{}},
+  data:{profile:null,settings:null,students:{},attendance:{},payments:{},exceptions:{},evals:{},packs:{},expenses:{},reminders:{}},
   ui:{view:'hoje', selDate:todayISO(), sid:null, q:'', filter:'ativos',
-      finY:new Date().getFullYear(), finM:new Date().getMonth()+1},
+      finY:new Date().getFullYear(), finM:new Date().getMonth()+1, finTab:'receber'},
   ob:null, draft:null,
 };
 const defDay=(on,start,end)=>({on,start,end});
+const defTemplates=()=>({
+  cobranca:'Olá, {primeiro}! Tudo bem? 💪\nPassando para lembrar da mensalidade de {mes}: {valor}, com vencimento no dia {vencimento}.\nQualquer dúvida, é só me chamar!',
+  cancel:'Olá, {primeiro}! Preciso cancelar nossa sessão de {data} às {hora}. 🙏\nMe diz um bom horário para repormos, combinado?',
+  saldo:'Olá, {primeiro}! 📋 Atualização do seu pacote de aulas: restam {saldo} aula(s).\nVamos programar a renovação? Me avisa!',
+});
 const defSettings=()=>({
   days:{0:defDay(false,'07:00','12:00'),1:defDay(true,'06:00','21:00'),2:defDay(true,'06:00','21:00'),
         3:defDay(true,'06:00','21:00'),4:defDay(true,'06:00','21:00'),5:defDay(true,'06:00','21:00'),
         6:defDay(false,'07:00','12:00')},
   dur:60, step:60,
+  payMethods:['Pix','Dinheiro','Cartão','Transferência'],
+  expCats:['Deslocamento','Combustível','Alimentação','Repasse','Equipamento','Outros'],
+  gyms:[], remindMin:30, packWarn:3, lastMethod:'',
+  templates:defTemplates(),
 });
-const settings=()=>S.data.settings||defSettings();
+const settings=()=>{
+  const d=defSettings(), s=S.data.settings||{};
+  return {...d,...s,days:{...d.days,...(s.days||{})},templates:{...d.templates,...(s.templates||{})}};
+};
 
 /* ================= storage layer ================= */
-function persistLocal(){ if(!S.cloud||S.syncDead){ try{localStorage.setItem(KEY,JSON.stringify(S.data))}catch(e){} } }
+function persistLocal(){
+  if(!S.cloud||S.syncDead){
+    try{localStorage.setItem(KEY,JSON.stringify(S.data))}
+    catch(e){
+      if(!S._lsErr){S._lsErr=true;toast('Não foi possível salvar neste navegador (armazenamento cheio). Exporte um backup e remova fotos antigas.','bad')}
+    }
+  }
+}
 function dbErr(e){
   if(e&&e.code==='quota_exceeded')toast('Limite de armazenamento na nuvem atingido — exclua dados antigos.','bad');
   else toast('Falha ao salvar na nuvem. Verifique a conexão e repita a ação.','bad');
@@ -546,7 +611,7 @@ function onData(){
 function subscribeAll(){
   S.db.doc('config/profile').onSnapshot(s=>{S.data.profile=s.exists?clone(s.data()):S.data.profile;onData()},syncLost);
   S.db.doc('config/settings').onSnapshot(s=>{if(s.exists){S.data.settings=clone(s.data());onData()}},syncLost);
-  ['students','attendance','payments','exceptions','evals'].forEach(c=>{
+  COLLS.forEach(c=>{
     S.db.collection(c).onSnapshot(qs=>{
       const o={}; qs.docs.forEach(d=>{o[d.id]=clone(d.data())}); S.data[c]=o; onData();
     },syncLost);
@@ -572,8 +637,8 @@ async function initStore(){
 }
 function loadLocal(){
   try{const raw=localStorage.getItem(KEY); if(raw){const d=JSON.parse(raw);
-    for(const k of ['profile','settings','students','attendance','payments','exceptions','evals'])
-      if(d[k]!==undefined)S.data[k]=d[k];
+    for(const k of ['profile','settings',...COLLS])
+      if(d[k]!==undefined&&d[k]!==null)S.data[k]=d[k];
   }}catch(e){}
 }
 
@@ -808,6 +873,7 @@ function payStatus(sid,y,m){
   const s=stById(sid); if(!s)return{st:'none'};
   const rec=(payDoc(sid,y).months||{})[String(m)];
   if(rec)return{st:'pago',rec};
+  if(s.plan==='pacote')return{st:'none'};
   if(!(Number(s.fee)>0))return{st:'none'};
   const startYm=s.start?ymOf(s.start):(s.createdAt?ymOf(s.createdAt):null);
   const thisYm=y+'-'+pad(m);
@@ -818,18 +884,37 @@ function payStatus(sid,y,m){
   if(y<cy||(y===cy&&m<cm)||(y===cy&&m===cm&&t.getDate()>due))return{st:'atrasado'};
   return{st:'pendente'};
 }
-function togglePaid(sid,y,m){
+function togglePaid(sid,y,m,via){
   const doc=clone(payDoc(sid,y)); doc.months=doc.months||{};
   const k=String(m);
   if(doc.months[k]){
     delete doc.months[k]; putDoc('payments',sid+'_'+y,doc); toast('Pagamento desfeito.');
   }else{
     const s=stById(sid), rec={paid:true,at:todayISO(),amount:Number(s&&s.fee)||0};
+    if(via)rec.via=via;
     doc.months[k]=rec;
     mergeDoc('payments',sid+'_'+y,{sid,year:y,months:{[k]:rec}},doc);
-    toast('Pagamento registrado ✓');
+    toast('Pagamento registrado ✓'+(via?' · '+via:''));
   }
 }
+/* registra (nunca desfaz): se o mês já estiver pago, só atualiza a forma */
+function setPaid(sid,y,m,via){
+  const doc=clone(payDoc(sid,y)); doc.months=doc.months||{};
+  const k=String(m);
+  if(doc.months[k]){
+    doc.months[k].via=via;
+    mergeDoc('payments',sid+'_'+y,{months:{[k]:clone(doc.months[k])}},doc);
+    toast('Este mês já estava pago — forma atualizada para '+via+'.');
+  }else{
+    const s=stById(sid), rec={paid:true,at:todayISO(),amount:Number(s&&s.fee)||0,via};
+    doc.months[k]=rec;
+    mergeDoc('payments',sid+'_'+y,{sid,year:y,months:{[k]:rec}},doc);
+    toast('Pagamento registrado ✓ · '+via);
+  }
+}
+const LMKEY='prancheta-lastmethod';
+const getLM=()=>{try{return localStorage.getItem(LMKEY)||settings().lastMethod||''}catch(e){return ''}};
+const setLM=v=>{try{localStorage.setItem(LMKEY,v)}catch(e){}};
 function occupancy(){
   const st=settings(); let avail=0;
   for(let d=0;d<7;d++){const c=st.days[d];if(c&&c.on)avail+=Math.max(0,toMin(c.end)-toMin(c.start))}
@@ -838,16 +923,19 @@ function occupancy(){
   return{avail,booked,pct:avail?Math.min(100,Math.round(booked/avail*100)):0};
 }
 function monthRevenue(y,m){
-  let got=0,exp=0;
+  let got=0,exp=0,packSales=0;
   const thisYm=y+'-'+pad(m);
   for(const s of students()){
     const fee=Number(s.fee)||0;
     const rec=(payDoc(s.id,y).months||{})[String(m)];
     if(rec)got+=Number(rec.amount)||fee;
     const startYm=s.start?ymOf(s.start):(s.createdAt?ymOf(s.createdAt):null);
-    if(fee>0&&s.active!==false&&!(startYm&&thisYm<startYm))exp+=fee;
+    if(fee>0&&s.active!==false&&s.plan!=='pacote'&&!(startYm&&thisYm<startYm))exp+=fee;
   }
-  return{got,exp};
+  for(const p of Object.values(S.data.packs)){
+    if(p&&(p.at||'').slice(0,7)===thisYm){got+=Number(p.value)||0;packSales+=Number(p.value)||0}
+  }
+  return{got,exp,packSales};
 }
 function birthdaysOf(mo){
   return students().filter(s=>s.birth&&Number(s.birth.slice(5,7))===mo&&s.active!==false)
@@ -858,6 +946,202 @@ function whatsHref(phone){
   if(!d)return null;
   if(d.length<=11)d='55'+d;
   return 'https://wa.me/'+d;
+}
+function waMsgHref(phone,text){
+  const base=whatsHref(phone);
+  return base?base+'?text='+encodeURIComponent(text):null;
+}
+
+/* ---------- WhatsApp templates ---------- */
+function artigoDe(s){ return s&&s.gender==='f'?'a':s&&s.gender==='m'?'o':'o(a)'; }
+function fillTemplate(tpl,ctx){
+  return String(tpl||'').replace(/\{(\w+)\}/g,(m0,k)=>ctx[k]!==undefined?ctx[k]:m0);
+}
+function tplCtx(s,extra){
+  const art=artigoDe(s);
+  return {
+    nome:s?s.name:'', primeiro:s?firstName(s.name):'',
+    artigo:art, Artigo:art.charAt(0).toUpperCase()+art.slice(1),
+    ...(extra||{}),
+  };
+}
+
+/* ---------- pacotes de aulas ---------- */
+const studentPacks=sid=>Object.entries(S.data.packs)
+  .map(([id,p])=>({id,...p})).filter(p=>p.sid===sid)
+  .sort((a,b)=>String(a.at).localeCompare(String(b.at)));
+/* O saldo é contado por CICLO: packStart marca o início do ciclo atual; só os
+   pacotes vendidos a partir dele somam créditos, e só as presenças "ok" a partir
+   dele contam como uso. Lançar um pacote com o saldo zerado inicia um novo ciclo
+   (packStart avança), então presenças da época de mensalidade não consomem o
+   pacote novo. */
+function packCycleStart(sid){
+  const s=stById(sid); if(!s)return null;
+  if(s.packStart)return s.packStart;
+  const first=studentPacks(sid)[0];
+  return first?first.at:null;
+}
+function packUsed(sid){
+  const start=packCycleStart(sid); if(!start)return 0;
+  let n=0;
+  for(const[id,doc]of Object.entries(S.data.attendance)){
+    if(!id.startsWith(sid+'_')||!doc.marks)continue;
+    for(const[k,v]of Object.entries(doc.marks))
+      if(v.s==='ok'&&k.slice(0,10)>=start)n++;
+  }
+  return n;
+}
+function packInfo(sid){
+  const start=packCycleStart(sid);
+  const packs=studentPacks(sid);
+  const credits=packs.filter(p=>!start||String(p.at)>=start).reduce((a,p)=>a+(Number(p.qty)||0),0);
+  const hasOld=!!start&&packs.some(p=>String(p.at)<start);
+  const used=packUsed(sid);
+  return{credits,used,left:credits-used,start,hasOld};
+}
+function packAlerts(){
+  const warn=Number(settings().packWarn)||3, out=[];
+  for(const s of activeStudents()){
+    if(s.plan!=='pacote')continue;
+    const pi=packInfo(s.id);
+    if(pi.credits===0)out.push({s,left:0,none:true});
+    else if(pi.left<=0)out.push({s,left:pi.left,out:true});
+    else if(pi.left<=warn)out.push({s,left:pi.left});
+  }
+  return out.sort((a,b)=>a.left-b.left);
+}
+
+/* ---------- gastos ---------- */
+function addExpense(item){ /* item: {d, cat, v, note} */
+  const docId=ymOf(item.d);
+  const doc=clone(S.data.expenses[docId]||{ym:docId,items:{}});
+  doc.items=doc.items||{};
+  const id=uid('g'); doc.items[id]=item;
+  mergeDoc('expenses',docId,{ym:docId,items:{[id]:clone(item)}},doc);
+}
+function delExpense(docId,id){
+  const doc=clone(S.data.expenses[docId]); if(!doc||!doc.items)return;
+  delete doc.items[id];
+  putDoc('expenses',docId,doc);
+}
+function monthExpenses(ym){
+  const doc=S.data.expenses[ym], out=[];
+  if(doc&&doc.items)for(const[id,it]of Object.entries(doc.items))out.push({id,docId:ym,...it});
+  return out.sort((a,b)=>String(b.d).localeCompare(String(a.d)));
+}
+function expTotal(ym){ return monthExpenses(ym).reduce((a,e)=>a+(Number(e.v)||0),0); }
+function expByCat(ym){
+  const o={};
+  for(const e of monthExpenses(ym))o[e.cat||'Outros']=(o[e.cat||'Outros']||0)+(Number(e.v)||0);
+  return Object.entries(o).sort((a,b)=>b[1]-a[1]);
+}
+function revByMethod(y,m){
+  const o={}, thisYm=y+'-'+pad(m);
+  for(const s of students()){
+    const rec=(payDoc(s.id,y).months||{})[String(m)];
+    if(rec){const k=rec.via||'Não informado';o[k]=(o[k]||0)+(Number(rec.amount)||Number(s.fee)||0)}
+  }
+  for(const p of Object.values(S.data.packs))
+    if(p&&(p.at||'').slice(0,7)===thisYm){const k=p.via||'Não informado';o[k]=(o[k]||0)+(Number(p.value)||0)}
+  return Object.entries(o).sort((a,b)=>b[1]-a[1]);
+}
+function gymRepasse(y,m){
+  const st=settings(), thisYm=y+'-'+pad(m), out=[];
+  for(const g of st.gyms||[]){
+    let total=0, n=0;
+    for(const s of students()){
+      if(s.gymId!==g.id)continue;
+      const rec=(payDoc(s.id,y).months||{})[String(m)];
+      let received=rec?(Number(rec.amount)||Number(s.fee)||0):0;
+      for(const p of studentPacks(s.id))if((p.at||'').slice(0,7)===thisYm)received+=Number(p.value)||0;
+      if(received>0){n++; total+=g.kind==='pct'?received*(Number(g.rate)||0)/100:(Number(g.rate)||0)}
+    }
+    if(n>0||total>0)out.push({g,total,n});
+  }
+  return out;
+}
+
+/* ---------- lembretes e notificações ---------- */
+function canNotify(){ return 'Notification' in window; }
+function notify(title,body){
+  toast(title+(body?' — '+body:''),'warn');
+  try{ if(canNotify()&&Notification.permission==='granted')new Notification(title,{body,icon:undefined}); }catch(e){}
+}
+const firedKey='prancheta-fired-v1';
+function firedMap(){ try{return JSON.parse(localStorage.getItem(firedKey)||'{}')}catch(e){return{}} }
+function markFired(k){
+  try{
+    const m=firedMap(); m[k]=Date.now();
+    const cut=Date.now()-2*86400000;
+    for(const kk of Object.keys(m))if(m[kk]<cut)delete m[kk];
+    localStorage.setItem(firedKey,JSON.stringify(m));
+  }catch(e){}
+}
+function reminderTick(){
+  if(S.mode!=='app'||!S.data.profile)return;
+  const now=new Date(), fired=firedMap();
+  const lead=Number(settings().remindMin)||0;
+  if(lead>0){
+    const iso=todayISO(), nowMin=now.getHours()*60+now.getMinutes();
+    for(const it of daySessions(iso).list){
+      const diff=toMin(it.time)-nowMin;
+      if(diff>0&&diff<=lead){
+        const k='s|'+iso+'|'+it.time+'|'+it.sid;
+        if(fired[k])continue;
+        const s=stById(it.sid); if(!s)continue;
+        markFired(k);
+        notify('Treino em '+diff+' min','' +s.name+' às '+it.time);
+      }
+    }
+  }
+  for(const[id,r]of Object.entries(S.data.reminders)){
+    if(!r||r.done||r.fired)continue;
+    const at=new Date(r.at);
+    if(at<=now){
+      const k='r|'+id;
+      if(fired[k])continue;
+      markFired(k);
+      putDoc('reminders',id,{...r,fired:true});
+      notify('Lembrete',r.text);
+    }
+  }
+}
+setInterval(reminderTick,30000);
+
+/* ---------- fotos ---------- */
+function pickPhoto(cb){
+  const inp=document.createElement('input');
+  inp.type='file'; inp.accept='image/*';
+  inp.addEventListener('change',()=>{
+    const f=inp.files&&inp.files[0]; if(!f)return;
+    const rd=new FileReader();
+    rd.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        const SZ=144, cv=document.createElement('canvas');
+        cv.width=SZ; cv.height=SZ;
+        const cx=cv.getContext('2d');
+        const r=Math.max(SZ/img.width,SZ/img.height);
+        const w=img.width*r, h=img.height*r;
+        cx.drawImage(img,(SZ-w)/2,(SZ-h)/2,w,h);
+        let q=0.82, url=cv.toDataURL('image/jpeg',q);
+        while(url.length>26000&&q>0.4){q-=0.12;url=cv.toDataURL('image/jpeg',q)}
+        cb(url);
+      };
+      img.onerror=()=>toast('Não foi possível ler essa imagem.','warn');
+      img.src=rd.result;
+    };
+    rd.readAsDataURL(f);
+  });
+  inp.click();
+}
+function safePhoto(p){
+  return (typeof p==='string'&&/^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(p))?p:'';
+}
+function avatarHTML(obj,cls,fallbackColor){
+  const color=(obj&&obj.color)||fallbackColor||'var(--btn)';
+  const photo=safePhoto(obj&&obj.photo);
+  return `<span class="avatar ${cls}" style="background:${color}">${photo?`<img src="${photo}" alt="">`:esc(initials(obj&&obj.name))}</span>`;
 }
 function schedLabel(s){
   const sc=(s.schedule||[]).slice().sort((a,b)=>(a.d===0?7:a.d)-(b.d===0?7:b.d)||toMin(a.t)-toMin(b.t));
@@ -1002,7 +1286,11 @@ function vHoje(){
       <div class="sub">${fmtLong(iso)}</div>
     </div>
     <button class="btn sm ghost" data-a="stu-new">${I.plus} Aluno</button></div>
-  ${bd.map(s=>`<div class="banner" style="margin-bottom:12px">🎉 Hoje é aniversário de <b>&nbsp;${esc(s.name)}</b>!</div>`).join('')}
+  ${bd.map(s=>`<div class="banner" style="margin-bottom:12px"><span style="flex:none">🎉</span><span class="grow">Hoje é aniversário de <b>${esc(s.name)}</b>!</span></div>`).join('')}
+  ${packAlerts().slice(0,3).map(a=>`<button class="banner warnb" style="margin-bottom:12px;width:100%;text-align:left;cursor:pointer" data-a="stu" data-sid="${a.s.id}"><span style="flex:none">📦</span><span class="grow">${
+    a.none?`<b>${esc(a.s.name)}</b> está sem pacote de aulas ativo.`
+    :a.out?`<b>${esc(a.s.name)}</b> está com o pacote esgotado${a.left<0?' ('+(-a.left)+' aula(s) além do saldo)':''} — hora de renovar!`
+    :`<b>${esc(a.s.name)}</b> tem só <b>${a.left}</b> aula(s) restantes no pacote.`}</span></button>`).join('')}
   <div class="tiles">
     <div class="tile"><div class="l">Sessões hoje</div><div class="v big-num">${list.length}</div><div class="d">${done} concluída${done===1?'':'s'}</div></div>
     <div class="tile"><div class="l">Alunos ativos</div><div class="v big-num">${activeStudents().length}</div><div class="d">${students().length-activeStudents().length} pausado(s)</div></div>
@@ -1013,9 +1301,29 @@ function vHoje(){
     ${list.length||cancelled.length?`<div class="lst">${list.map(it=>sessCard(iso,it)).join('')}${cancelled.map(it=>sessCancelCard(iso,it)).join('')}</div>`
       :`<div class="empty">${I.sun}<div class="big">Dia livre</div>Nenhum treino agendado para hoje.</div>`}
   </div>
+  <div class="sec"><div class="row between"><div class="eyebrow">Lembretes</div>
+    <button class="btn sm ghost" data-a="rem-new">${I.plus} Lembrete</button></div>
+    ${remindersHTML()}
+  </div>
   ${upcoming.length?`<div class="sec"><div class="eyebrow">Aniversários do mês</div><div class="card" style="padding:8px 14px">
     ${upcoming.map(s=>`<div class="row" style="padding:7px 0"><span style="width:22px">🎂</span><span class="grow" style="font-weight:600">${esc(s.name)}</span><span class="muted small mono">${pad(s.bday)}/${pad(t.getMonth()+1)}</span></div>`).join('')}
   </div></div>`:''}`;
+}
+function remindersHTML(){
+  const now=new Date();
+  const list=Object.entries(S.data.reminders).map(([id,r])=>({id,...r}))
+    .filter(r=>!r.done).sort((a,b)=>String(a.at).localeCompare(String(b.at))).slice(0,5);
+  const needPerm=canNotify()&&Notification.permission==='default'&&(Number(settings().remindMin)>0||list.length);
+  const perm=needPerm?`<button class="banner" style="width:100%;text-align:left;cursor:pointer;margin-bottom:9px" data-a="notif-ask">${I.bell.replace('<svg','<svg width="17" height="17"')} Ativar notificações neste aparelho</button>`:'';
+  if(!list.length)return perm+`<p class="small muted">Sem lembretes pendentes. Os treinos avisam ${Number(settings().remindMin)>0?settings().remindMin+' min antes':'— ative a antecedência em Mais'} com o app aberto.</p>`;
+  return perm+`<div class="card" style="padding:6px 14px">${list.map((r,i)=>{
+    const d2=new Date(r.at), late=d2<=now;
+    return`<div class="row" style="padding:8px 0;${i<list.length-1?'border-bottom:1px solid var(--line)':''}">
+      <span class="pill ${late?'warn':'mut'} mono" style="flex:none">${pad(d2.getDate())}/${pad(d2.getMonth()+1)} ${pad(d2.getHours())}:${pad(d2.getMinutes())}</span>
+      <span class="grow" style="font-size:13.5px;font-weight:600">${esc(r.text)}</span>
+      <button class="icon-btn" style="width:30px;height:30px" data-a="rem-done" data-id="${r.id}" title="Concluir">${I.check}</button>
+    </div>`}).join('')}
+  </div>`;
 }
 function sessCard(iso,it){
   const s=stById(it.sid); if(!s)return'';
@@ -1024,7 +1332,7 @@ function sessCard(iso,it){
   return `<div class="sess ${st==='ok'?'done':st==='miss'?'missed':''}">
     <div class="tm mono">${it.time}<span class="e">${toHM(toMin(it.time)+it.dur)}</span></div>
     <button class="who" data-a="sess-sheet" data-iso="${iso}" data-sid="${it.sid}" data-time="${it.time}" data-kind="${it.kind}">
-      <span class="avatar s40" style="background:${s.color||COLORS[6]}">${esc(initials(s.name))}</span>
+      ${avatarHTML(s,'s40',COLORS[6])}
       <span class="grow"><span class="nm">${esc(s.name)} ${flag}</span><br><span class="g">${esc(s.goal||'')}${s.goal&&it.dur?' · ':''}${it.dur} min</span></span>
     </button>
     <div class="acts">
@@ -1037,7 +1345,7 @@ function sessCancelCard(iso,it){
   const s=stById(it.sid); if(!s)return'';
   return `<div class="sess cancelled">
     <div class="tm mono">${it.time}</div>
-    <div class="who"><span class="avatar s40" style="background:${s.color||COLORS[6]}">${esc(initials(s.name))}</span>
+    <div class="who">${avatarHTML(s,'s40',COLORS[6])}
       <span class="grow"><span class="nm">${esc(s.name)}</span><br><span class="g">Sessão cancelada</span></span></div>
     <button class="btn sm soft" data-a="exc-restore" data-doc="${it.exc.docId}" data-id="${it.exc.id}">Restaurar</button>
   </div>`;
@@ -1144,7 +1452,7 @@ function openSessSheet(iso,sid,time,kind){
   const kindL=it.kind==='extra'?'Sessão avulsa':it.kind==='moved'?'Sessão remarcada':'Sessão recorrente';
   openLayer(`<div class="modal" role="dialog">
     <div class="m-head">
-      <span class="avatar s40" style="background:${s.color||COLORS[6]}">${esc(initials(s.name))}</span>
+      ${avatarHTML(s,'s40',COLORS[6])}
       <div class="grow"><h2 style="font-size:15.5px">${esc(s.name)}</h2>
       <div class="small muted mono">${fmtDM(iso)} · ${it.time}–${toHM(toMin(it.time)+it.dur)} · ${kindL}</div></div>
       <button class="icon-btn" data-a="layer-close">${I.x}</button></div>
@@ -1158,6 +1466,7 @@ function openSessSheet(iso,sid,time,kind){
       <div class="lst">
         <button class="rowcard" data-a="sess-move" data-iso="${iso}" data-sid="${sid}" data-time="${time}" data-kind="${kind}"><span class="icon-btn" style="background:var(--surface2)">${I.move}</span><span class="grow"><span class="nm">Remarcar</span><div class="dt">Mover só esta sessão para outro dia ou horário</div></span></button>
         ${kind==='reg'?`<button class="rowcard" data-a="sess-cancel" data-iso="${iso}" data-sid="${sid}" data-time="${time}"><span class="icon-btn" style="background:var(--surface2)">${I.x}</span><span class="grow"><span class="nm">Cancelar esta sessão</span><div class="dt">Só nesta data — o horário fixo continua</div></span></button>`:''}
+        ${kind==='reg'&&wa?`<button class="rowcard" data-a="sess-cancel-wa" data-iso="${iso}" data-sid="${sid}" data-time="${time}"><span class="icon-btn" style="background:var(--warn-soft);color:var(--warn)">${I.msg}</span><span class="grow"><span class="nm">Cancelar e avisar no WhatsApp</span><div class="dt">Cancela e abre a mensagem pronta para ${esc(firstName(s.name))}</div></span></button>`:''}
         ${kind==='moved'?`<button class="rowcard" data-a="sess-unmove" data-doc="${it.exc.docId}" data-id="${it.exc.id}"><span class="icon-btn" style="background:var(--surface2)">${I.back}</span><span class="grow"><span class="nm">Desfazer remarcação</span><div class="dt">Volta para o dia e horário originais</div></span></button>`:''}
         ${kind==='extra'?`<button class="rowcard" data-a="sess-unmove" data-doc="${it.exc.docId}" data-id="${it.exc.id}"><span class="icon-btn" style="background:var(--surface2)">${I.trash}</span><span class="grow"><span class="nm">Remover sessão avulsa</span></span></button>`:''}
         <button class="rowcard" data-a="stu" data-sid="${sid}"><span class="icon-btn" style="background:var(--surface2)">${I.user}</span><span class="grow"><span class="nm">Ver perfil do aluno</span></span></button>
@@ -1269,14 +1578,16 @@ function stuListHTML(){
   if(!list.length)return`<div class="empty">${I.users}<div class="big">${q?'Nenhum aluno encontrado':'Nenhum aluno por aqui'}</div>${q?'Tente outra busca.':'Toque em “Novo aluno” para começar.'}</div>`;
   const t=new Date();
   return list.map(s=>{
-    const ps=Number(s.fee)>0?payStatus(s.id,t.getFullYear(),t.getMonth()+1):null;
+    const ps=Number(s.fee)>0&&s.plan!=='pacote'?payStatus(s.id,t.getFullYear(),t.getMonth()+1):null;
+    const pk=s.plan==='pacote'?packInfo(s.id):null;
+    const pkWarn=pk&&pk.credits>0&&pk.left<=(Number(settings().packWarn)||3);
     const att=attStatsAll(s.id);
     return `<button class="rowcard" data-a="stu" data-sid="${s.id}">
-      <span class="avatar s40" style="background:${s.color||COLORS[6]}">${esc(initials(s.name))}</span>
+      ${avatarHTML(s,'s40',COLORS[6])}
       <span class="grow"><span class="nm">${esc(s.name)}</span>
         <div class="dt mono">${esc(schedLabel(s))}</div></span>
       <span style="display:grid;gap:4px;justify-items:end">
-        ${s.active===false?'<span class="pill mut">Pausado</span>':ps&&['pago','atrasado','pendente'].includes(ps.st)?`<span class="pill ${ps.st==='pago'?'ok':ps.st==='atrasado'?'bad':'warn'}">${ps.st==='pago'?'Pago':ps.st==='atrasado'?'Atrasado':'Pendente'}</span>`:''}
+        ${s.active===false?'<span class="pill mut">Pausado</span>':pk?`<span class="pill ${pk.left<=0?'bad':pkWarn?'warn':'acc'} mono">📦 ${pk.credits===0?'sem pacote':pk.left<=0?'esgotado':pk.left+' aula(s)'}</span>`:ps&&['pago','atrasado','pendente'].includes(ps.st)?`<span class="pill ${ps.st==='pago'?'ok':ps.st==='atrasado'?'bad':'warn'}">${ps.st==='pago'?'Pago':ps.st==='atrasado'?'Atrasado':'Pendente'}</span>`:''}
         ${att.rate!==null?`<span class="small muted mono">${att.rate}% freq.</span>`:''}
       </span>${I.chr.replace('<svg','<svg class="chev" width="16" height="16" style="color:var(--ink2)"')}
     </button>`;
@@ -1300,12 +1611,14 @@ function vAluno(){
   const age=s.birth?Math.floor((Date.now()-dateOf(s.birth).getTime())/31557600000):null;
   return `<button class="row" data-a="nav" data-v="alunos" style="color:var(--ink2);font-weight:600;font-size:13px;margin-bottom:14px;cursor:pointer">${I.back.replace('<svg','<svg width="16" height="16"')} Alunos</button>
   <div class="stu-head">
-    <span class="avatar s56" style="background:${s.color||COLORS[6]}">${esc(initials(s.name))}</span>
+    ${avatarHTML(s,'s56',COLORS[6])}
     <div class="grow"><h1>${esc(s.name)}</h1>
       <div class="row" style="gap:6px;margin-top:4px;flex-wrap:wrap">
         ${s.active===false?'<span class="pill mut">Pausado</span>':'<span class="pill ok">Ativo</span>'}
+        <span class="pill ${s.plan==='pacote'?'acc':'mut'}">${s.plan==='pacote'?'Pacote de aulas':'Mensalidade'}</span>
         ${s.goal?`<span class="pill acc">${esc(s.goal)}</span>`:''}
         ${age!==null?`<span class="pill mut">${age} anos</span>`:''}
+        ${(()=>{const g=(settings().gyms||[]).find(x=>x.id===s.gymId);return g?`<span class="pill mut">${I.bldg.replace('<svg','<svg width="12" height="12" style="display:inline;vertical-align:-2px"')} ${esc(g.name)}</span>`:''})()}
       </div></div>
   </div>
   <div class="stu-actions">
@@ -1315,7 +1628,7 @@ function vAluno(){
     <button class="btn sm danger ghost" data-a="stu-del" data-sid="${s.id}">${I.trash} Excluir</button>
   </div>
   <div class="sec"><div class="kv">
-    ${Number(s.fee)>0?`<div class="it"><div class="k">Mensalidade</div><div class="v mono">${brl(s.fee)}</div></div>
+    ${Number(s.fee)>0&&s.plan!=='pacote'?`<div class="it"><div class="k">Mensalidade</div><div class="v mono">${brl(s.fee)}</div></div>
     <div class="it"><div class="k">Vencimento</div><div class="v">Dia ${s.dueDay||5}</div></div>`:''}
     <div class="it"><div class="k">Início</div><div class="v mono">${s.start?fmtDMY(s.start):'—'}</div></div>
     <div class="it"><div class="k">Duração</div><div class="v">${sDur(s)} min${s.dur?'':' (padrão)'}</div></div>
@@ -1336,13 +1649,14 @@ function vAluno(){
           <div class="marks-strip">${marks.slice(0,14).reverse().map(m=>`<span class="mk-dot ${m.s==='ok'?'ok':'miss'}" title="${esc(m.k.split('|')[0])}">${m.s==='ok'?'✓':'✗'}</span>`).join('')||'<span class="small muted">Sem registros ainda</span>'}</div></div>
       </div>
     </div></div>
-  ${Number(s.fee)>0?`<div class="sec"><div class="eyebrow">Pagamentos · ${y}</div>
+  ${s.plan==='pacote'||studentPacks(s.id).length?packSectionHTML(s,wa):''}
+  ${Number(s.fee)>0&&s.plan!=='pacote'?`<div class="sec"><div class="eyebrow">Pagamentos · ${y}</div>
     <div class="card"><div class="paygrid">${Array.from({length:12},(_,i)=>{
       const m=i+1, ps=payStatus(s.id,y,m);
       const off=ps.st==='futuro'||ps.st==='fora';
       const cls=ps.st==='pago'?'pago':ps.st==='atrasado'?'atrasado':off?'fut':'';
       const lbl=ps.st==='pago'?fmtDM(ps.rec.at):ps.st==='atrasado'?'Atrasado':off?'—':'Em aberto';
-      return`<button class="paycell ${cls}" data-a="pay-toggle" data-sid="${s.id}" data-y="${y}" data-m="${m}" ${off?'disabled':''}><span class="m">${MONS[i]}</span><span class="s mono">${lbl}</span></button>`;
+      return`<button class="paycell ${cls}" data-a="${ps.st==='pago'?'pay-toggle':'pay-open'}" data-sid="${s.id}" data-y="${y}" data-m="${m}" ${off?'disabled':''}><span class="m">${MONS[i]}</span><span class="s mono">${lbl}</span></button>`;
     }).join('')}</div>
     <p class="hint" style="margin-top:9px;color:var(--ink2);font-size:11.5px">Toque em um mês para marcar ou desfazer o pagamento.</p></div></div>`:''}
   <div class="sec"><div class="row between"><div class="eyebrow">Evolução de peso</div>
@@ -1363,6 +1677,38 @@ function vAluno(){
   <div class="sec"><div class="eyebrow">Observações</div>
     <div class="card" style="min-height:52px;font-size:14px;white-space:pre-wrap">${s.notes?esc(s.notes):'<span class="muted small">Sem observações. Use “Editar” para anotar lesões, restrições, preferências…</span>'}</div></div>`;
 }
+function packSectionHTML(s,wa){
+  const pi=packInfo(s.id), packs=studentPacks(s.id).slice().reverse();
+  const warn=Number(settings().packWarn)||3;
+  const out=pi.credits>0&&pi.left<=0;
+  const low=pi.credits>0&&pi.left>0&&pi.left<=warn;
+  const pct=pi.credits?Math.max(0,Math.min(100,Math.round(pi.left/pi.credits*100))):0;
+  return `<div class="sec"><div class="row between" style="flex-wrap:wrap;gap:8px"><div class="eyebrow">Pacote de aulas</div>
+    <div class="row" style="gap:7px">
+      ${wa?`<button class="btn sm ghost" data-a="wa-saldo" data-sid="${s.id}">${I.msg} Enviar saldo</button>`:''}
+      <button class="btn sm" data-a="pack-new" data-sid="${s.id}">${I.plus} Lançar pacote</button>
+    </div></div>
+    <div class="card">
+      ${out?`<div class="banner warnb" style="margin-bottom:12px"><span style="flex:none">📦</span><span class="grow">Pacote esgotado${pi.left<0?' — <b>'+(-pi.left)+'</b> aula(s) dadas além do saldo':''}. Lançar um pacote novo inicia um ciclo zerado.</span></div>`
+      :low?`<div class="banner warnb" style="margin-bottom:12px"><span style="flex:none">📦</span><span class="grow">Restam só <b>${pi.left}</b> aula(s) — hora de renovar!</span></div>`:''}
+      ${pi.credits===0?'<p class="small muted">Nenhum pacote ativo. Toque em “Lançar pacote” para começar — cada presença confirmada desconta 1 aula.</p>':`
+      <div class="row" style="gap:22px;flex-wrap:wrap">
+        <div><div class="small muted">Saldo</div><div class="big-num" style="font-size:26px;color:${pi.left<=0?'var(--bad)':low?'var(--warn)':'var(--ink)'}">${pi.left}</div></div>
+        <div><div class="small muted">Compradas (ciclo)</div><div class="big-num" style="font-size:26px">${pi.credits}</div></div>
+        <div><div class="small muted">Usadas (ciclo)</div><div class="big-num" style="font-size:26px">${pi.used}</div></div>
+        <div class="grow" style="min-width:120px;align-self:center"><div class="bar"><i class="${low||out?'':'acc'}" style="width:${pct}%;${out?'background:var(--bad)':low?'background:var(--warn)':''}"></i></div></div>
+      </div>`}
+      ${packs.length?`<div style="margin-top:12px">${packs.slice(0,6).map(p=>{
+        const old=pi.start&&String(p.at)<pi.start;
+        return`<div class="row" style="padding:7px 0;border-top:1px solid var(--line);${old?'opacity:.55':''}">
+          <span class="mono small" style="width:74px">${fmtDMY(p.at)}</span>
+          <b>${p.qty} aulas</b>
+          ${old?'<span class="pill mut" style="font-size:10px">ciclo anterior</span>':''}
+          <span class="grow small muted" style="text-align:right">${brl(p.value)}${p.via?' · '+esc(p.via):''}</span>
+          <button class="icon-btn" style="width:28px;height:28px" data-a="pack-del" data-id="${p.id}" title="Excluir pacote">${I.x}</button>
+        </div>`}).join('')}</div>`:''}
+    </div></div>`;
+}
 function evalChart(entries){
   const pts=entries.slice(-12);
   const ws=pts.map(p=>p.w), min=Math.min(...ws), max=Math.max(...ws);
@@ -1379,19 +1725,43 @@ function evalChart(entries){
 function openStudentForm(sid){
   const ex=sid?stById(sid):null;
   S.draft=ex?clone(ex):{name:'',phone:'',goal:'',color:COLORS[Math.floor(Math.random()*COLORS.length)],
-    fee:'',dueDay:5,birth:'',start:todayISO(),notes:'',active:true,dur:null,schedule:[]};
+    fee:'',dueDay:5,birth:'',start:todayISO(),notes:'',active:true,dur:null,schedule:[],
+    gender:'',plan:'mensal',gymId:'',photo:''};
   S.draft.id=sid||null;
   const d=S.draft;
+  const gyms=settings().gyms||[];
   openLayer(`<div class="modal wide" role="dialog">
     <div class="m-head"><h2>${sid?'Editar aluno':'Novo aluno'}</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
     <div class="m-body">
-      <div class="f"><label>Nome completo *</label><input id="sf-name" value="${esc(d.name)}" placeholder="Nome do aluno"></div>
+      <div class="row" style="gap:14px;align-items:flex-start;margin-bottom:4px">
+        <button type="button" class="photopick" id="sf-photo" title="Foto do aluno">
+          ${safePhoto(d.photo)?`<img src="${safePhoto(d.photo)}" alt=""><span class="rm" title="Remover foto">${I.x}</span>`:I.cam}
+        </button>
+        <div class="grow">
+          <div class="f"><label>Nome completo *</label><input id="sf-name" value="${esc(d.name)}" placeholder="Nome do aluno"></div>
+        </div>
+      </div>
       <div class="f2">
         <div class="f"><label>Telefone (WhatsApp)</label><input id="sf-phone" value="${esc(d.phone)}" inputmode="tel" placeholder="(21) 99999-9999"></div>
+        <div class="f"><label>Tratamento</label><select id="sf-gender">
+          <option value="" ${!d.gender?'selected':''}>Neutro</option>
+          <option value="m" ${d.gender==='m'?'selected':''}>Ele (o)</option>
+          <option value="f" ${d.gender==='f'?'selected':''}>Ela (a)</option>
+        </select><div class="hint">Usado nas mensagens de WhatsApp ({artigo}).</div></div>
+      </div>
+      <div class="f2">
         <div class="f"><label>Objetivo</label><select id="sf-goal"><option value="">—</option>${GOALS.map(g=>`<option ${d.goal===g?'selected':''}>${g}</option>`).join('')}</select></div>
+        <div class="f"><label>Academia / local</label><select id="sf-gym">
+          <option value="">Nenhuma</option>
+          ${gyms.map(g=>`<option value="${g.id}" ${d.gymId===g.id?'selected':''}>${esc(g.name)}</option>`).join('')}
+        </select><div class="hint">Cadastre academias em Mais → Academias e repasse.</div></div>
       </div>
       <div class="f"><label>Cor na agenda</label><div class="swatches" id="sf-colors">${COLORS.map(c=>`<button type="button" class="sw ${d.color===c?'on':''}" style="background:${c}" data-c="${c}" aria-label="cor"></button>`).join('')}</div></div>
-      <div class="f2">
+      <div class="f"><label>Forma de cobrança</label><select id="sf-plan">
+        <option value="mensal" ${d.plan!=='pacote'?'selected':''}>Mensalidade fixa</option>
+        <option value="pacote" ${d.plan==='pacote'?'selected':''}>Pacote de aulas</option>
+      </select><div class="hint">No pacote, cada presença confirmada desconta 1 aula do saldo.</div></div>
+      <div class="f2" id="sf-feewrap" style="${d.plan==='pacote'?'display:none':''}">
         <div class="f"><label>Mensalidade (R$)</label><input id="sf-fee" type="number" min="0" step="0.01" inputmode="decimal" value="${d.fee||''}" placeholder="0,00"></div>
         <div class="f"><label>Dia de vencimento</label><select id="sf-due">${Array.from({length:28},(_,i)=>`<option value="${i+1}" ${Number(d.dueDay)===i+1?'selected':''}>Dia ${i+1}</option>`).join('')}</select></div>
       </div>
@@ -1421,6 +1791,19 @@ function openStudentForm(sid){
     S.draft.color=b.dataset.c;
     $$('#sf-colors .sw').forEach(x=>x.classList.toggle('on',x===b));
   });
+  $('#sf-photo').addEventListener('click',e=>{
+    if(!S.draft)return;
+    if(e.target.closest('.rm')){
+      S.draft.photo='';
+      const el=$('#sf-photo'); if(el)el.innerHTML=I.cam;
+      return;
+    }
+    pickPhoto(url=>{ if(!S.draft)return; S.draft.photo=url;
+      const el=$('#sf-photo'); if(el)el.innerHTML=`<img src="${url}" alt=""><span class="rm" title="Remover foto">${I.x}</span>`; });
+  });
+  $('#sf-plan').addEventListener('change',e=>{
+    const w=$('#sf-feewrap'); if(w)w.style.display=e.target.value==='pacote'?'none':'';
+  });
 }
 function schedChipsHTML(){
   const d=S.draft;
@@ -1438,6 +1821,7 @@ function syncDraftFields(){
   d.fee=g('sf-fee')?Number(g('sf-fee')):''; d.dueDay=Number(g('sf-due'))||5;
   d.start=g('sf-start'); d.birth=g('sf-birth');
   d.dur=g('sf-dur')?Number(g('sf-dur')):null; d.notes=g('sf-notes');
+  d.gender=g('sf-gender'); d.plan=g('sf-plan')||'mensal'; d.gymId=g('sf-gym');
 }
 function openSlotBrowser(){
   syncDraftFields();
@@ -1531,7 +1915,9 @@ function saveStudent(){
   const id=d.id||uid('a');
   const body={name:d.name,phone:d.phone,goal:d.goal,color:d.color,fee:d.fee===''?'':Number(d.fee),
     dueDay:d.dueDay,birth:d.birth,start:d.start,notes:d.notes,active:d.active!==false,
-    dur:d.dur,schedule:d.schedule,createdAt:(d.createdAt||todayISO())};
+    dur:d.dur,schedule:d.schedule,createdAt:(d.createdAt||todayISO()),
+    gender:d.gender||'',plan:d.plan||'mensal',gymId:d.gymId||'',photo:d.photo||'',
+    packStart:d.packStart||''};
   putDoc('students',id,body);
   closeAllLayers();
   toast(d.id?'Aluno atualizado ✓':d.name.split(' ')[0]+' cadastrado(a) ✓');
@@ -1548,6 +1934,7 @@ function deleteStudent(sid){
       delDoc('students',sid);
       for(const id of Object.keys(S.data.attendance))if(id.startsWith(sid+'_'))delDoc('attendance',id);
       for(const id of Object.keys(S.data.payments))if(id.startsWith(sid+'_'))delDoc('payments',id);
+      for(const id of Object.keys(S.data.packs))if((S.data.packs[id]||{}).sid===sid)delDoc('packs',id);
       if(S.data.evals[sid])delDoc('evals',sid);
       for(const[docId,doc]of Object.entries(S.data.exceptions)){
         const items={...(doc.items||{})}; let ch=false;
@@ -1587,40 +1974,402 @@ function openEvalForm(sid){
 
 /* ================= FINANCEIRO ================= */
 function vFin(){
-  const y=S.ui.finY, m=S.ui.finM;
-  const rows=students().filter(s=>Number(s.fee)>0)
-    .sort((a,b)=>(a.active===false?1:0)-(b.active===false?1:0)||a.name.localeCompare(b.name));
-  let got=0,exp=0,late=0;
-  const items=rows.map(s=>{
-    const ps=payStatus(s.id,y,m);
-    if(ps.st==='pago')got+=Number(ps.rec.amount)||Number(s.fee)||0;
-    if(s.active!==false&&ps.st!=='fora')exp+=Number(s.fee)||0;
-    if(ps.st==='atrasado')late++;
-    return{s,ps};
-  });
-  return `<div class="hd"><div><h1>Financeiro</h1><div class="sub">Mensalidades e recebimentos</div></div></div>
+  const y=S.ui.finY, m=S.ui.finM, tab=S.ui.finTab||'receber';
+  return `<div class="hd"><div><h1>Financeiro</h1><div class="sub">Recebimentos, gastos e relatórios</div></div>
+    <div class="seg">${[['receber','Receber'],['gastos','Gastos'],['rel','Relatório']].map(([k,l])=>`<button class="${tab===k?'on':''}" data-a="fin-tab" data-t="${k}">${l}</button>`).join('')}</div></div>
   <div class="wknav">
     <button class="icon-btn" data-a="fin-nav" data-n="-1">${I.chl}</button>
     <div class="ttl">${MON[m-1][0].toUpperCase()+MON[m-1].slice(1)} de ${y}</div>
     <button class="icon-btn" data-a="fin-nav" data-n="1">${I.chr}</button>
   </div>
-  <div class="tiles" style="grid-template-columns:repeat(auto-fit,minmax(108px,1fr))">
-    <div class="tile"><div class="l">Recebido</div><div class="v big-num" style="font-size:17px;padding-top:6px;color:var(--ok)">${brl(got)}</div></div>
-    <div class="tile"><div class="l">Previsto</div><div class="v big-num" style="font-size:17px;padding-top:6px">${brl(exp)}</div></div>
+  ${tab==='receber'?finReceber(y,m):tab==='gastos'?finGastos(y,m):finRelatorio(y,m)}`;
+}
+function finReceber(y,m){
+  const thisYm=y+'-'+pad(m);
+  /* inclui também quem mudou para pacote mas tem mensalidade registrada neste mês,
+     para o histórico não sumir da tela */
+  const rows=students().filter(s=>(Number(s.fee)>0&&s.plan!=='pacote')||(payDoc(s.id,y).months||{})[String(m)])
+    .sort((a,b)=>(a.active===false?1:0)-(b.active===false?1:0)||a.name.localeCompare(b.name));
+  let got=0,exp=0,late=0;
+  const items=rows.map(s=>{
+    const ps=payStatus(s.id,y,m);
+    if(ps.st==='pago')got+=Number(ps.rec.amount)||Number(s.fee)||0;
+    if(s.active!==false&&s.plan!=='pacote'&&ps.st!=='fora')exp+=Number(s.fee)||0;
+    if(ps.st==='atrasado')late++;
+    return{s,ps};
+  });
+  const monthPacks=Object.entries(S.data.packs).map(([id,p])=>({id,...p}))
+    .filter(p=>(p.at||'').slice(0,7)===thisYm)
+    .sort((a,b)=>String(b.at).localeCompare(String(a.at)));
+  const packTotal=monthPacks.reduce((a,p)=>a+(Number(p.value)||0),0);
+  return `<div class="tiles" style="grid-template-columns:repeat(auto-fit,minmax(108px,1fr))">
+    <div class="tile"><div class="l">Recebido</div><div class="v big-num" style="font-size:17px;padding-top:6px;color:var(--ok)">${brl(got+packTotal)}</div><div class="d">${packTotal?brl(packTotal)+' em pacotes':''}</div></div>
+    <div class="tile"><div class="l">Previsto (mensal)</div><div class="v big-num" style="font-size:17px;padding-top:6px">${brl(exp)}</div></div>
     <div class="tile"><div class="l">Atrasados</div><div class="v big-num" style="color:${late?'var(--bad)':'inherit'}">${late}</div></div>
   </div>
-  <div class="sec"><div class="eyebrow">Alunos</div>
+  <div class="sec"><div class="eyebrow">Mensalidades</div>
   ${items.length?`<div class="lst">${items.map(({s,ps})=>{
-    const wa=whatsHref(s.phone);
+    const cob=waCobrancaHref(s,y,m);
     return`<div class="finrow">
-      <span class="avatar s40" style="background:${s.color||COLORS[6]}">${esc(initials(s.name))}</span>
+      ${avatarHTML(s,'s40',COLORS[6])}
       <div class="grow" style="min-width:0"><div class="row" style="gap:8px"><b style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.name)}</b>${s.active===false?'<span class="pill mut">Pausado</span>':''}</div>
-        <div class="small muted mono">${brl(s.fee)} · vence dia ${s.dueDay||5}${ps.st==='pago'?' · pago em '+fmtDM(ps.rec.at):''}</div></div>
+        <div class="small muted mono">${brl(ps.st==='pago'?(Number(ps.rec.amount)||s.fee):s.fee)} · ${s.plan==='pacote'?'agora no plano pacote':'vence dia '+(s.dueDay||5)}${ps.st==='pago'?' · pago em '+fmtDM(ps.rec.at)+(ps.rec.via?' · '+esc(ps.rec.via):''):''}</div></div>
       <span class="pill ${ps.st==='pago'?'ok':ps.st==='atrasado'?'bad':(ps.st==='futuro'||ps.st==='fora')?'mut':'warn'}">${ps.st==='pago'?'Pago':ps.st==='atrasado'?'Atrasado':(ps.st==='futuro'||ps.st==='fora')?'—':'Em aberto'}</span>
-      ${(ps.st!=='futuro'&&ps.st!=='fora')?`<button class="btn sm ${ps.st==='pago'?'soft':''}" data-a="pay-toggle" data-sid="${s.id}" data-y="${y}" data-m="${m}">${ps.st==='pago'?'Desfazer':'Receber'}</button>`:''}
-      ${ps.st==='atrasado'&&wa?`<a class="icon-btn" href="${wa}" target="_blank" rel="noopener" title="Cobrar no WhatsApp">${I.phone}</a>`:''}
+      ${(ps.st!=='futuro'&&ps.st!=='fora')?(ps.st==='pago'
+        ?`<button class="btn sm soft" data-a="pay-toggle" data-sid="${s.id}" data-y="${y}" data-m="${m}">Desfazer</button>`
+        :`<button class="btn sm" data-a="pay-open" data-sid="${s.id}" data-y="${y}" data-m="${m}">Receber</button>`):''}
+      ${(ps.st==='atrasado'||ps.st==='pendente')&&cob?`<a class="icon-btn" href="${cob}" target="_blank" rel="noopener" title="Cobrar no WhatsApp (mensagem pronta)">${I.msg}</a>`:''}
     </div>`}).join('')}</div>`
-  :`<div class="empty">${I.cash}<div class="big">Nenhuma mensalidade cadastrada</div>Defina o valor da mensalidade no cadastro dos alunos.</div>`}</div>`;
+  :`<div class="empty">${I.cash}<div class="big">Nenhuma mensalidade neste modo</div>Alunos no plano “pacote” aparecem abaixo, em Pacotes vendidos.</div>`}</div>
+  <div class="sec"><div class="eyebrow">Pacotes vendidos no mês</div>
+    ${monthPacks.length?`<div class="lst">${monthPacks.map(p=>{
+      const s=stById(p.sid);
+      return`<div class="finrow">
+        ${avatarHTML(s||{name:'?'},'s40',COLORS[6])}
+        <div class="grow" style="min-width:0"><b>${esc(s?s.name:'Aluno removido')}</b>
+          <div class="small muted mono">${fmtDM(p.at)} · ${p.qty} aulas${p.via?' · '+esc(p.via):''}</div></div>
+        <b class="mono" style="color:var(--ok)">${brl(p.value)}</b>
+      </div>`}).join('')}</div>`
+    :'<p class="small muted">Nenhum pacote vendido neste mês. Lance pacotes no perfil do aluno.</p>'}
+  </div>`;
+}
+function waCobrancaHref(s,y,m){
+  if(!whatsHref(s.phone))return null;
+  const txt=fillTemplate(settings().templates.cobranca,tplCtx(s,{
+    valor:brl(s.fee),mes:MON[m-1],vencimento:String(s.dueDay||5),
+  }));
+  return waMsgHref(s.phone,txt);
+}
+function finGastos(y,m){
+  const ym=y+'-'+pad(m);
+  const list=monthExpenses(ym), total=expTotal(ym);
+  const reps=gymRepasse(y,m);
+  return `<div class="tiles" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
+    <div class="tile"><div class="l">Total de gastos</div><div class="v big-num" style="font-size:17px;padding-top:6px;color:${total?'var(--bad)':'inherit'}">${brl(total)}</div></div>
+    <div class="tile"><div class="l">Lançamentos</div><div class="v big-num">${list.length}</div></div>
+  </div>
+  <div class="sec"><div class="row between"><div class="eyebrow">Gastos do mês</div>
+    <button class="btn sm" data-a="exp-new">${I.plus} Lançar gasto</button></div>
+  ${list.length?`<div class="lst">${list.map(e=>`
+    <div class="finrow">
+      <span class="icon-btn" style="background:var(--surface2);cursor:default">${e.cat==='Combustível'?I.fuel:e.cat==='Repasse'?I.bldg:I.wallet}</span>
+      <div class="grow" style="min-width:0"><b>${esc(e.cat||'Outros')}</b>
+        <div class="small muted">${fmtDM(e.d)}${e.note?' · '+esc(e.note):''}</div></div>
+      <b class="mono">${brl(e.v)}</b>
+      <button class="icon-btn" data-a="exp-del" data-doc="${e.docId}" data-id="${e.id}" title="Excluir">${I.x}</button>
+    </div>`).join('')}</div>`
+  :`<div class="empty">${I.wallet}<div class="big">Nenhum gasto lançado</div>Registre deslocamento, combustível, alimentação, repasse…</div>`}</div>
+  ${reps.length?`<div class="sec"><div class="eyebrow">Repasse às academias</div>
+    <div class="card" style="padding:8px 16px">${reps.map(r=>{
+      const launched=list.some(e=>e.gymId===r.g.id);
+      return`<div class="row" style="padding:8px 0;flex-wrap:wrap">
+        <span class="grow"><b>${esc(r.g.name)}</b><div class="small muted">${r.n} aluno(s) pagante(s) · ${r.g.kind==='pct'?r.g.rate+'% do recebido':brl(r.g.rate)+' por aluno'}</div></span>
+        <b class="mono">${brl(r.total)}</b>
+        ${launched?'<span class="pill ok">Lançado ✓</span>':`<button class="btn sm ghost" data-a="exp-repasse" data-gym="${r.g.id}" data-v="${r.total}" data-y="${y}" data-m="${m}">Lançar como gasto</button>`}
+      </div>`}).join('')}</div></div>`:''}`;
+}
+/* ---- relatório com gráficos ---- */
+function last6(y,m){
+  const out=[];
+  for(let i=5;i>=0;i--){
+    let mm=m-i, yy=y;
+    while(mm<1){mm+=12;yy--}
+    out.push({y:yy,m:mm,ym:yy+'-'+pad(mm)});
+  }
+  return out;
+}
+function finRelatorio(y,m){
+  const per=last6(y,m);
+  const data=per.map(p=>{
+    const r=monthRevenue(p.y,p.m);
+    return{...p,rec:r.got,gas:expTotal(p.ym)};
+  });
+  const cur=data[data.length-1];
+  const lucro=cur.rec-cur.gas;
+  const methods=revByMethod(y,m);
+  const cats=expByCat(y+'-'+pad(m));
+  const reps=gymRepasse(y,m);
+  const repTotal=reps.reduce((a,r)=>a+r.total,0);
+  return `<div class="tiles">
+    <div class="tile"><div class="l">Receita</div><div class="v big-num" style="font-size:17px;padding-top:6px;color:var(--ok)">${brl(cur.rec)}</div></div>
+    <div class="tile"><div class="l">Gastos</div><div class="v big-num" style="font-size:17px;padding-top:6px;color:${cur.gas?'var(--bad)':'inherit'}">${brl(cur.gas)}</div></div>
+    <div class="tile"><div class="l">Lucro</div><div class="v big-num" style="font-size:17px;padding-top:6px;color:${lucro>=0?'var(--ok)':'var(--bad)'}">${brl(lucro)}</div></div>
+    <div class="tile"><div class="l">Repasse devido</div><div class="v big-num" style="font-size:17px;padding-top:6px">${brl(repTotal)}</div></div>
+  </div>
+  <div class="sec"><div class="eyebrow">Receita × gastos — últimos 6 meses</div>
+    <div class="card">
+      <div class="legend"><span><i style="background:var(--ch1)"></i>Receita</span><span><i style="background:var(--ch2)"></i>Gastos</span></div>
+      <div class="gbars">${groupedBars(data)}</div>
+    </div></div>
+  <div class="sec"><div class="eyebrow">Receita por forma de recebimento — ${MONS[m-1]}</div>
+    <div class="card">${methods.length?hbars(methods,false):'<p class="small muted">Nenhum recebimento registrado neste mês.</p>'}</div></div>
+  <div class="sec"><div class="eyebrow">Gastos por categoria — ${MONS[m-1]}</div>
+    <div class="card">${cats.length?hbars(cats,true):'<p class="small muted">Nenhum gasto lançado neste mês.</p>'}</div></div>`;
+}
+function groupedBars(data){
+  const W=560,H=190,PB=26,PT=18,PL=8,PR=8;
+  const max=Math.max(1,...data.map(d=>Math.max(d.rec,d.gas)));
+  const gw=(W-PL-PR)/data.length, bw=Math.min(26,(gw-14)/2);
+  const yOf=v=>PT+(H-PB-PT)*(1-v/max);
+  const short=v=>v>=1000?(v/1000).toLocaleString('pt-BR',{maximumFractionDigits:1})+'k':String(Math.round(v));
+  let bars='';
+  data.forEach((d,i)=>{
+    const cx=PL+gw*i+gw/2;
+    const x1=cx-bw-1, x2=cx+1;
+    const h1=Math.max(d.rec>0?3:0,H-PB-yOf(d.rec)), h2=Math.max(d.gas>0?3:0,H-PB-yOf(d.gas));
+    bars+=`<rect x="${x1.toFixed(1)}" y="${(H-PB-h1).toFixed(1)}" width="${bw.toFixed(1)}" height="${h1.toFixed(1)}" rx="4" fill="var(--ch1)"><title>${MONS[d.m-1]}: receita ${brl(d.rec)}</title></rect>`;
+    bars+=`<rect x="${x2.toFixed(1)}" y="${(H-PB-h2).toFixed(1)}" width="${bw.toFixed(1)}" height="${h2.toFixed(1)}" rx="4" fill="var(--ch2)"><title>${MONS[d.m-1]}: gastos ${brl(d.gas)}</title></rect>`;
+    if(i===data.length-1||d.rec===max)
+      bars+=`<text x="${(x1+bw/2).toFixed(1)}" y="${(H-PB-h1-5).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" fill="var(--ink2)">${short(d.rec)}</text>`;
+    bars+=`<text x="${cx.toFixed(1)}" y="${H-8}" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--ink2)">${MONS[d.m-1]}</text>`;
+  });
+  const grid=[0.5,1].map(f=>`<line x1="${PL}" x2="${W-PR}" y1="${yOf(max*f).toFixed(1)}" y2="${yOf(max*f).toFixed(1)}" stroke="var(--line)" stroke-width="1"/>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Receita e gastos por mês">
+    ${grid}<line x1="${PL}" x2="${W-PR}" y1="${H-PB}" y2="${H-PB}" stroke="var(--line)" stroke-width="1"/>${bars}</svg>`;
+}
+function hbars(pairs,isExp){
+  const max=Math.max(1,...pairs.map(p=>p[1]));
+  return `<div class="hbars">${pairs.map(([k,v])=>`
+    <div class="r" title="${esc(k)}: ${brl(v)}">
+      <span class="lb">${esc(k)}</span>
+      <span class="tr"><span class="fl ${isExp?'g':''}" style="width:${Math.max(2,Math.round(v/max*100))}%"></span></span>
+      <span class="vl">${brl(v)}</span>
+    </div>`).join('')}</div>`;
+}
+
+/* ================= sheets: recebimento, pacote, gasto, lembrete ================= */
+function openPaySheet(sid,y,m){
+  const s=stById(sid); if(!s)return;
+  const st=settings(), methods=st.payMethods||[];
+  const last=getLM();
+  openLayer(`<div class="modal" role="dialog">
+    <div class="m-head">${avatarHTML(s,'s40',COLORS[6])}<div class="grow"><h2 style="font-size:15.5px">Receber de ${esc(firstName(s.name))}</h2>
+      <div class="small muted mono">${MON[m-1]} · ${brl(s.fee)}</div></div>
+      <button class="icon-btn" data-a="layer-close">${I.x}</button></div>
+    <div class="m-body">
+      <div class="eyebrow" style="margin-bottom:9px">Como o valor foi recebido?</div>
+      <div class="lst">${methods.map(mm=>`<button class="rowcard" data-a="pay-via" data-sid="${sid}" data-y="${y}" data-m="${m}" data-via="${esc(mm)}">
+        <span class="icon-btn" style="background:var(--surface2)">${I.wallet}</span>
+        <span class="grow"><span class="nm">${esc(mm)}</span></span>
+        ${mm===last?'<span class="pill acc">última usada</span>':''}
+      </button>`).join('')}</div>
+      <button class="btn ghost sm" data-a="pay-manage" style="margin-top:12px;border:none">${I.plus} Gerenciar formas de recebimento</button>
+    </div></div>`,{sheet:true});
+}
+function openPackForm(sid){
+  const s=stById(sid); if(!s)return;
+  const st=settings(), id=uid('pk'), lm=getLM();
+  openLayer(`<div class="modal" role="dialog">
+    <div class="m-head"><h2>Lançar pacote — ${esc(firstName(s.name))}</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
+    <div class="m-body">
+      <div class="f2">
+        <div class="f"><label>Quantidade de aulas *</label><select id="${id}-q">${[1,2,4,5,8,10,12,16,20,24,30].map(q=>`<option value="${q}" ${q===10?'selected':''}>${q} aulas</option>`).join('')}</select></div>
+        <div class="f"><label>Valor total (R$) *</label><input id="${id}-v" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00"></div>
+      </div>
+      <div class="f2">
+        <div class="f"><label>Data da venda</label><input id="${id}-d" type="date" value="${todayISO()}"></div>
+        <div class="f"><label>Forma de recebimento</label><select id="${id}-via">${(st.payMethods||[]).map(mm=>`<option ${mm===lm?'selected':''}>${esc(mm)}</option>`).join('')}</select></div>
+      </div>
+      <div class="f"><label>Observação (opcional)</label><input id="${id}-n" placeholder="Ex.: promoção, renovação…"></div>
+      ${s.plan!=='pacote'?`<label class="checkline" style="margin-bottom:10px"><input type="checkbox" id="${id}-pl" checked>Mudar a cobrança de ${esc(firstName(s.name))} para pacote de aulas</label>
+      <p class="hint" style="color:var(--ink2);font-size:11.5px;margin-top:-4px">No plano pacote, a mensalidade deixa de ser cobrada e cada presença desconta 1 aula do saldo.</p>`:''}
+      <div id="${id}-err"></div>
+    </div>
+    <div class="m-foot"><button class="btn soft" data-a="layer-close">Cancelar</button><button class="btn" id="${id}-ok">Lançar pacote</button></div>
+  </div>`);
+  $('#'+id+'-ok').addEventListener('click',()=>{
+    const qty=Number($('#'+id+'-q').value), v=Number($('#'+id+'-v').value), dt=$('#'+id+'-d').value;
+    if(!qty||!(v>=0)||!dt){$('#'+id+'-err').innerHTML='<div class="f"><div class="err">Informe quantidade, valor e data.</div></div>';return}
+    const via=$('#'+id+'-via').value;
+    const pi=packInfo(sid); /* estado do ciclo ANTES do pacote novo */
+    putDoc('packs',uid('p'),{sid,qty,value:v,at:dt,via,note:$('#'+id+'-n').value.trim()});
+    const body=clone(S.data.students[sid]);
+    let changed=false, planChanged=false, newCycle=false;
+    let ps2=body.packStart;
+    if(!ps2||pi.credits===0||pi.left<=0){ if(ps2!==dt){ps2=dt;newCycle=!!body.packStart} }
+    else if(dt<ps2)ps2=dt;
+    if(ps2!==body.packStart){body.packStart=ps2;changed=true}
+    const plEl=$('#'+id+'-pl');
+    const wantPlan=s.plan==='pacote'||!plEl||plEl.checked;
+    if(wantPlan&&body.plan!=='pacote'){body.plan='pacote';changed=true;planChanged=true}
+    if(changed)putDoc('students',sid,body);
+    if(via)setLM(via);
+    closeAllLayers(); renderMain();
+    toast('Pacote de '+qty+' aulas lançado ✓'+(newCycle?' Novo ciclo iniciado.':''));
+    if(planChanged)toast('A cobrança de '+firstName(s.name)+' agora é por pacote (sem mensalidade).','warn');
+  });
+}
+function openExpenseForm(){
+  const st=settings(), id=uid('gx');
+  const y=S.ui.finY, m=S.ui.finM;
+  const t=new Date();
+  const defDate=(y===t.getFullYear()&&m===t.getMonth()+1)?todayISO():y+'-'+pad(m)+'-01';
+  openLayer(`<div class="modal" role="dialog">
+    <div class="m-head"><h2>Lançar gasto</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
+    <div class="m-body">
+      <div class="f2">
+        <div class="f"><label>Valor (R$) *</label><input id="${id}-v" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00"></div>
+        <div class="f"><label>Data</label><input id="${id}-d" type="date" value="${defDate}"></div>
+      </div>
+      <div class="f"><label>Categoria</label><select id="${id}-c">${(st.expCats||[]).map(c=>`<option>${esc(c)}</option>`).join('')}</select>
+        <div class="hint">Edite as categorias em Mais → Categorias de gasto.</div></div>
+      <div class="f"><label>Observação (opcional)</label><input id="${id}-n" placeholder="Ex.: Uber até a academia"></div>
+      <div id="${id}-err"></div>
+    </div>
+    <div class="m-foot"><button class="btn soft" data-a="layer-close">Cancelar</button><button class="btn" id="${id}-ok">Lançar</button></div>
+  </div>`,{sheet:true});
+  $('#'+id+'-ok').addEventListener('click',()=>{
+    const v=Number($('#'+id+'-v').value), dt=$('#'+id+'-d').value;
+    if(!(v>0)||!dt){$('#'+id+'-err').innerHTML='<div class="f"><div class="err">Informe valor e data.</div></div>';return}
+    addExpense({d:dt,cat:$('#'+id+'-c').value,v,note:$('#'+id+'-n').value.trim()});
+    closeAllLayers(); renderMain(); toast('Gasto lançado ✓');
+  });
+}
+function openReminderForm(){
+  const id=uid('rm');
+  const d=new Date(Date.now()+3600000);
+  const defAt=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':00';
+  openLayer(`<div class="modal" role="dialog">
+    <div class="m-head"><h2>Novo lembrete</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
+    <div class="m-body">
+      <div class="f"><label>O que lembrar? *</label><input id="${id}-t" placeholder="Ex.: Cobrar renovação da Maria"></div>
+      <div class="f"><label>Quando</label><input id="${id}-d" type="datetime-local" value="${defAt}"></div>
+      <p class="hint" style="color:var(--ink2);font-size:11.5px">O aviso aparece no app (e como notificação, se ativada) quando o horário chegar com o app aberto.</p>
+      <div id="${id}-err"></div>
+    </div>
+    <div class="m-foot"><button class="btn soft" data-a="layer-close">Cancelar</button><button class="btn" id="${id}-ok">Criar</button></div>
+  </div>`,{sheet:true});
+  $('#'+id+'-ok').addEventListener('click',()=>{
+    const tx=$('#'+id+'-t').value.trim(), at=$('#'+id+'-d').value;
+    if(!tx||!at){$('#'+id+'-err').innerHTML='<div class="f"><div class="err">Preencha texto e horário.</div></div>';return}
+    putDoc('reminders',uid('r'),{text:tx,at,done:false,createdAt:todayISO()});
+    closeAllLayers(); renderMain(); toast('Lembrete criado ✓');
+  });
+}
+
+/* ================= gerenciadores (Mais) ================= */
+function openListManager({title,hint,items,onSave,extra}){
+  const id=uid('mg');
+  const list=items.slice();
+  openLayer(`<div class="modal" role="dialog">
+    <div class="m-head"><h2>${esc(title)}</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
+    <div class="m-body">
+      ${hint?`<p class="small muted" style="margin-bottom:11px">${hint}</p>`:''}
+      <div class="mglist" id="${id}-l"></div>
+      <div class="row" style="margin-top:12px"><input id="${id}-n" class="grow" placeholder="Nova opção…" style="background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px"><button class="btn sm" id="${id}-add">${I.plus} Adicionar</button></div>
+    </div>
+    <div class="m-foot"><button class="btn soft" data-a="layer-close">Cancelar</button><button class="btn" id="${id}-ok">Salvar</button></div>
+  </div>`);
+  const paint=()=>{ $('#'+id+'-l').innerHTML=list.length?list.map((it,i)=>`
+    <div class="mgrow"><span class="grow">${esc(it)}</span>
+      <button class="icon-btn" data-i="${i}" title="Remover">${I.x}</button></div>`).join('')
+    :'<p class="small muted">Nenhuma opção — adicione abaixo.</p>'; };
+  paint();
+  $('#'+id+'-l').addEventListener('click',e=>{
+    const b=e.target.closest('button[data-i]'); if(!b)return;
+    list.splice(Number(b.dataset.i),1); paint();
+  });
+  const add=()=>{
+    const v=$('#'+id+'-n').value.trim(); if(!v)return;
+    if(list.some(x=>x.toLowerCase()===v.toLowerCase())){toast('Essa opção já existe.','warn');return}
+    list.push(v); $('#'+id+'-n').value=''; paint();
+  };
+  $('#'+id+'-add').addEventListener('click',add);
+  $('#'+id+'-n').addEventListener('keydown',e=>{if(e.key==='Enter')add()});
+  $('#'+id+'-ok').addEventListener('click',()=>{
+    if(!list.length){toast('Deixe pelo menos uma opção.','warn');return}
+    onSave(list); closeLayer(); renderMain(); toast('Salvo ✓');
+  });
+}
+function openGymManager(){
+  const st=settings(), id=uid('gy');
+  const gyms=clone(st.gyms||[]);
+  openLayer(`<div class="modal" role="dialog">
+    <div class="m-head"><h2>Academias e repasse</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
+    <div class="m-body">
+      <p class="small muted" style="margin-bottom:11px">Cadastre os locais onde você atende e a taxa de repasse. Vincule alunos à academia no cadastro deles — o relatório calcula o repasse do mês.</p>
+      <div class="mglist" id="${id}-l"></div>
+      <div class="card" style="margin-top:13px;padding:13px">
+        <div class="f"><label>Nome da academia</label><input id="${id}-n" placeholder="Ex.: Smart Fit Centro"></div>
+        <div class="f2">
+          <div class="f"><label>Tipo de repasse</label><select id="${id}-k"><option value="pct">% do recebido</option><option value="fix">R$ fixo por aluno/mês</option></select></div>
+          <div class="f"><label>Taxa</label><input id="${id}-r" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Ex.: 20"></div>
+        </div>
+        <button class="btn sm wide" id="${id}-add">${I.plus} Adicionar academia</button>
+      </div>
+    </div>
+    <div class="m-foot"><button class="btn soft" data-a="layer-close">Cancelar</button><button class="btn" id="${id}-ok">Salvar</button></div>
+  </div>`);
+  const paint=()=>{ $('#'+id+'-l').innerHTML=gyms.length?gyms.map((g,i)=>`
+    <div class="mgrow"><span class="icon-btn" style="width:30px;height:30px;background:var(--surface);cursor:default">${I.bldg}</span>
+      <span class="grow">${esc(g.name)}<div class="small muted" style="font-weight:500">${g.kind==='pct'?g.rate+'% do recebido':brl(g.rate)+' por aluno/mês'}</div></span>
+      <button class="icon-btn" data-i="${i}" title="Remover">${I.x}</button></div>`).join('')
+    :'<p class="small muted">Nenhuma academia cadastrada.</p>'; };
+  paint();
+  $('#'+id+'-l').addEventListener('click',e=>{
+    const b=e.target.closest('button[data-i]'); if(!b)return;
+    gyms.splice(Number(b.dataset.i),1); paint();
+  });
+  $('#'+id+'-add').addEventListener('click',()=>{
+    const n=$('#'+id+'-n').value.trim(), r=Number($('#'+id+'-r').value);
+    if(!n||!(r>=0)){toast('Informe nome e taxa.','warn');return}
+    gyms.push({id:uid('gm'),name:n,kind:$('#'+id+'-k').value,rate:r});
+    $('#'+id+'-n').value=''; $('#'+id+'-r').value=''; paint();
+  });
+  $('#'+id+'-ok').addEventListener('click',()=>{
+    putCfg('settings',{...settings(),gyms}); closeLayer(); renderMain(); toast('Academias salvas ✓');
+  });
+}
+function openTplEditor(){
+  const st=settings(), id=uid('tp');
+  const defs=defTemplates();
+  const rows=[
+    ['cobranca','Cobrança de mensalidade','{nome} {primeiro} {artigo} {valor} {mes} {vencimento}'],
+    ['cancel','Aviso de aula cancelada','{nome} {primeiro} {artigo} {data} {hora}'],
+    ['saldo','Saldo de aulas do pacote','{nome} {primeiro} {artigo} {saldo}'],
+  ];
+  openLayer(`<div class="modal wide" role="dialog">
+    <div class="m-head"><h2>Mensagens do WhatsApp</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
+    <div class="m-body">
+      <p class="small muted" style="margin-bottom:14px">Personalize os textos. As variáveis entre chaves são trocadas automaticamente pelos dados do aluno — <code style="background:var(--surface2);border-radius:4px;padding:1px 5px">{artigo}</code> vira “o” ou “a” conforme o tratamento do aluno.</p>
+      ${rows.map(([k,l,vars])=>`<div class="f"><label>${l}</label><textarea class="tpl" id="${id}-${k}">${esc(st.templates[k]||defs[k])}</textarea><div class="varchips">${vars.split(' ').map(v=>`<code>${v}</code>`).join('')}</div></div>`).join('')}
+      <button class="btn ghost sm" id="${id}-def" style="border:none">Restaurar textos padrão</button>
+    </div>
+    <div class="m-foot"><button class="btn soft" data-a="layer-close">Cancelar</button><button class="btn" id="${id}-ok">Salvar</button></div>
+  </div>`);
+  $('#'+id+'-def').addEventListener('click',()=>{
+    rows.forEach(([k])=>{$('#'+id+'-'+k).value=defs[k]});
+  });
+  $('#'+id+'-ok').addEventListener('click',()=>{
+    const templates={};
+    rows.forEach(([k])=>{templates[k]=$('#'+id+'-'+k).value});
+    putCfg('settings',{...settings(),templates});
+    closeLayer(); toast('Mensagens salvas ✓');
+  });
+}
+function openNotifPrefs(){
+  const st=settings(), id=uid('nt');
+  const perm=canNotify()?Notification.permission:'unsupported';
+  openLayer(`<div class="modal" role="dialog">
+    <div class="m-head"><h2>Notificações e lembretes</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
+    <div class="m-body">
+      <div class="f"><label>Avisar antes de cada treino</label>
+        <select id="${id}-m">${[[0,'Desligado'],[10,'10 minutos antes'],[15,'15 minutos antes'],[30,'30 minutos antes'],[60,'1 hora antes']].map(([v,l])=>`<option value="${v}" ${Number(st.remindMin)===v?'selected':''}>${l}</option>`).join('')}</select></div>
+      <div class="f"><label>Alerta de pacote acabando</label>
+        <select id="${id}-p">${[1,2,3,4,5].map(v=>`<option value="${v}" ${Number(st.packWarn)===v?'selected':''}>Com ${v} aula(s) restantes</option>`).join('')}</select></div>
+      <div class="card" style="padding:12px;margin-top:4px">
+        <div class="row"><span class="grow" style="font-size:13.5px;font-weight:600">Notificações do navegador</span>
+          <span class="pill ${perm==='granted'?'ok':perm==='denied'?'bad':'mut'}">${perm==='granted'?'Ativadas':perm==='denied'?'Bloqueadas':perm==='unsupported'?'Indisponível':'Não ativadas'}</span></div>
+        ${perm==='default'?`<button class="btn sm wide" data-a="notif-ask" style="margin-top:9px">${I.bell} Ativar notificações</button>`:''}
+        <p class="hint" style="margin-top:8px;color:var(--ink2);font-size:11.5px">Os avisos tocam com o app aberto (vale a aba em segundo plano). ${perm==='denied'?'Para reativar, ajuste as permissões do site no navegador.':''}</p>
+      </div>
+    </div>
+    <div class="m-foot"><button class="btn soft" data-a="layer-close">Cancelar</button><button class="btn" id="${id}-ok">Salvar</button></div>
+  </div>`);
+  $('#'+id+'-ok').addEventListener('click',()=>{
+    putCfg('settings',{...settings(),remindMin:Number($('#'+id+'-m').value),packWarn:Number($('#'+id+'-p').value)});
+    closeLayer(); renderMain(); toast('Preferências salvas ✓');
+  });
 }
 
 /* ================= MAIS (config) ================= */
@@ -1629,7 +2378,7 @@ function vMais(){
   const nStu=students().length;
   return `<div class="hd"><div><h1>Mais</h1><div class="sub">Perfil, preferências e dados</div></div></div>
   <div class="card"><div class="row" style="gap:14px">
-    <span class="avatar s56" style="background:var(--btn)">${esc(initials(p.name))}</span>
+    ${avatarHTML(p,'s56','var(--btn)')}
     <div class="grow"><b style="font-size:16.5px">${esc(p.name)}</b>
       <div class="small muted">${esc(p.email||'')}</div>
       <div class="row" style="gap:6px;margin-top:5px;flex-wrap:wrap">
@@ -1644,6 +2393,13 @@ function vMais(){
     <button class="cfgrow" data-a="cfg-prefs"><span class="lead">${I.clock}</span><span class="grow"><div class="t">Sessões e grade</div><div class="d">${st.dur} min por sessão · grade a cada ${st.step} min</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
     <div class="cfgrow"><span class="lead">${I.users}</span><span class="grow"><div class="t">Ocupação da agenda</div><div class="d">${Math.round(occ.booked/60)}h ocupadas de ${Math.round(occ.avail/60)}h disponíveis por semana</div><div class="bar" style="margin-top:6px;max-width:220px"><i class="acc" style="width:${occ.pct}%"></i></div></span><b class="mono">${occ.pct}%</b></div>
   </div></div>
+  <div class="sec"><div class="eyebrow">Trabalho</div><div class="card" style="padding:4px 16px">
+    <button class="cfgrow" data-a="tpl-edit"><span class="lead">${I.msg}</span><span class="grow"><div class="t">Mensagens do WhatsApp</div><div class="d">Cobrança, cancelamento e saldo de aulas — com variáveis</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
+    <button class="cfgrow" data-a="notif-prefs"><span class="lead">${I.bell}</span><span class="grow"><div class="t">Notificações e lembretes</div><div class="d">${Number(st.remindMin)>0?'Aviso '+st.remindMin+' min antes do treino':'Aviso de treino desligado'} · pacote com ${st.packWarn} aula(s)</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
+    <button class="cfgrow" data-a="mg-gyms"><span class="lead">${I.bldg}</span><span class="grow"><div class="t">Academias e repasse</div><div class="d">${(st.gyms||[]).length?(st.gyms||[]).map(g=>esc(g.name)).join(', '):'Nenhuma academia cadastrada'}</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
+    <button class="cfgrow" data-a="mg-methods"><span class="lead">${I.wallet}</span><span class="grow"><div class="t">Formas de recebimento</div><div class="d">${(st.payMethods||[]).map(esc).join(', ')}</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
+    <button class="cfgrow" data-a="mg-cats"><span class="lead">${I.fuel}</span><span class="grow"><div class="t">Categorias de gasto</div><div class="d">${(st.expCats||[]).map(esc).join(', ')}</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
+  </div></div>
   <div class="sec"><div class="eyebrow">Segurança</div><div class="card" style="padding:4px 16px">
     <button class="cfgrow" data-a="pw-change"><span class="lead">${I.key}</span><span class="grow"><div class="t">Alterar senha</div><div class="d">${p.hint?'Dica atual: '+esc(p.hint):'Sem dica de senha'}</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
     <button class="cfgrow" data-a="lock-now"><span class="lead">${I.lock}</span><span class="grow"><div class="t">Bloquear agora</div><div class="d">Sair e pedir a senha novamente</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
@@ -1657,9 +2413,15 @@ function vMais(){
 }
 function openProfileForm(){
   const p=S.data.profile, id=uid('pf');
+  let photo=safePhoto(p.photo||'');
   openLayer(`<div class="modal" role="dialog">
     <div class="m-head"><h2>Editar perfil</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
     <div class="m-body">
+      <div class="row" style="gap:14px;margin-bottom:12px">
+        <button type="button" class="photopick" id="${id}-ph" title="Sua foto">${photo?`<img src="${photo}" alt="">`:I.cam}</button>
+        <div class="small muted">Sua foto aparece no perfil e dá um toque profissional ao app.<br>
+        ${photo?`<button class="btn sm ghost" id="${id}-rm" style="margin-top:6px;border:none;color:var(--bad)">Remover foto</button>`:''}</div>
+      </div>
       <div class="f"><label>Nome completo *</label><input id="${id}-n" value="${esc(p.name)}"></div>
       <div class="f"><label>CREF</label><input id="${id}-c" value="${esc(p.cref||'')}" placeholder="000000-G/UF"></div>
       <div class="f"><label>E-mail *</label><input id="${id}-e" type="email" value="${esc(p.email||'')}"></div>
@@ -1667,10 +2429,15 @@ function openProfileForm(){
     </div>
     <div class="m-foot"><button class="btn soft" data-a="layer-close">Cancelar</button><button class="btn" id="${id}-ok">Salvar</button></div>
   </div>`);
+  $('#'+id+'-ph').addEventListener('click',()=>{
+    pickPhoto(url=>{photo=url;const el=$('#'+id+'-ph');if(el)el.innerHTML=`<img src="${url}" alt="">`});
+  });
+  const rm=$('#'+id+'-rm');
+  if(rm)rm.addEventListener('click',()=>{photo='';const el=$('#'+id+'-ph');if(el)el.innerHTML=I.cam;});
   $('#'+id+'-ok').addEventListener('click',()=>{
     const n=$('#'+id+'-n').value.trim(), e2=$('#'+id+'-e').value.trim();
     if(!n||!/.+@.+\..+/.test(e2)){$('#'+id+'-err').innerHTML='<div class="f"><div class="err">Informe nome e um e-mail válido.</div></div>';return}
-    putCfg('profile',{...p,name:n,cref:$('#'+id+'-c').value.trim(),email:e2});
+    putCfg('profile',{...p,name:n,cref:$('#'+id+'-c').value.trim(),email:e2,photo});
     closeLayer(); renderMain(); toast('Perfil atualizado ✓');
   });
 }
@@ -1759,9 +2526,9 @@ function openPwChange(){
 
 /* ================= backup ================= */
 async function exportData(){
-  const payload=JSON.stringify({app:'prancheta',v:1,at:new Date().toISOString(),
-    profile:S.data.profile,settings:S.data.settings,students:S.data.students,
-    attendance:S.data.attendance,payments:S.data.payments,exceptions:S.data.exceptions,evals:S.data.evals},null,2);
+  const payload=JSON.stringify({app:'prancheta',v:2,at:new Date().toISOString(),
+    profile:S.data.profile,settings:S.data.settings,
+    ...Object.fromEntries(COLLS.map(c=>[c,S.data[c]]))},null,2);
   let dl=null;
   try{ if(window.claude&&window.claude.use)dl=await window.claude.use('downloads'); }catch(e){}
   if(dl){
@@ -1802,7 +2569,7 @@ function openImport(){
       onOk:async()=>{
         okBtn.disabled=true; okBtn.textContent='Importando…';
         let fails=0;
-        for(const coll of['students','attendance','payments','exceptions','evals']){
+        for(const coll of COLLS){
           const inc=d[coll]||{};
           for(const idx of Object.keys({...S.data[coll]}))
             if(!inc[idx]){try{await delDocAwait(coll,idx)}catch(e){fails++}}
@@ -1823,17 +2590,26 @@ function wipeAll(){
   confirmDlg({title:'Apagar todos os dados',danger:true,okLabel:'Apagar tudo',typed:'APAGAR',
     msg:'Isso remove <b>todos</b> os alunos, horários, presenças, pagamentos e o seu cadastro. Não há como desfazer. Considere exportar um backup antes.',
     onOk:()=>{
-      for(const coll of['students','attendance','payments','exceptions','evals'])
+      for(const coll of COLLS)
         for(const id of Object.keys(S.data[coll]))delDoc(coll,id);
       delCfg('profile'); delCfg('settings');
       clearToken();
       try{localStorage.removeItem(KEY)}catch(e){}
-      S.data={profile:null,settings:null,students:{},attendance:{},payments:{},exceptions:{},evals:{}};
+      S.data={profile:null,settings:null,...Object.fromEntries(COLLS.map(c=>[c,{}]))};
       closeAllLayers();
       $('#app').classList.remove('on');
       toast('Dados apagados.');
       route();
     }});
+}
+
+function packWarnToast(sid){
+  const s=stById(sid);
+  if(!s||s.plan!=='pacote')return;
+  const pi=packInfo(sid), warn=Number(settings().packWarn)||3;
+  if(pi.credits===0)toast('📦 '+firstName(s.name)+' está sem pacote ativo — lance um pacote no perfil.','warn');
+  else if(pi.left<=0)toast('📦 O pacote de '+firstName(s.name)+' acabou — hora de renovar!','warn');
+  else if(pi.left<=warn)toast('📦 Restam '+pi.left+' aula(s) no pacote de '+firstName(s.name)+'.','warn');
 }
 
 /* ================= actions ================= */
@@ -1878,14 +2654,16 @@ const A={
   'mark':el=>{
     const{sid,iso,time,s}=el.dataset;
     const cur=getMark(sid,iso,time);
-    setMark(sid,iso,time,cur&&cur.s===s?null:s);
+    const nv=cur&&cur.s===s?null:s;
+    setMark(sid,iso,time,nv);
     renderMain();
+    if(nv==='ok')packWarnToast(sid);
   },
   'mark-close':el=>{
     const{sid,iso,time,s}=el.dataset;
     setMark(sid,iso,time,s||null);
     closeAllLayers(); renderMain();
-    if(s==='ok')toast('Presença registrada ✓');
+    if(s==='ok'){toast('Presença registrada ✓');packWarnToast(sid)}
   },
   'sess-sheet':el=>{const{iso,sid,time,kind}=el.dataset;openSessSheet(iso,sid,time,kind)},
   'sess-move':el=>{const{iso,sid,time,kind}=el.dataset;closeLayer();openMoveSheet(iso,sid,time,kind)},
@@ -1923,10 +2701,84 @@ const A={
   },
   'extra-new':()=>openExtraSheet(),
   'pay-toggle':el=>{togglePaid(el.dataset.sid,Number(el.dataset.y),Number(el.dataset.m));renderMain()},
+  'pay-open':el=>openPaySheet(el.dataset.sid,Number(el.dataset.y),Number(el.dataset.m)),
+  'pay-via':el=>{
+    const via=el.dataset.via;
+    setPaid(el.dataset.sid,Number(el.dataset.y),Number(el.dataset.m),via);
+    setLM(via);
+    closeAllLayers(); renderMain();
+  },
+  'pay-manage':()=>{
+    closeAllLayers();
+    A['mg-methods']();
+  },
+  'fin-tab':el=>{S.ui.finTab=el.dataset.t;renderMain()},
   'fin-nav':el=>{
     let m=S.ui.finM+Number(el.dataset.n), y=S.ui.finY;
     if(m<1){m=12;y--} if(m>12){m=1;y++}
     S.ui.finM=m;S.ui.finY=y;renderMain();
+  },
+  'pack-new':el=>openPackForm(el.dataset.sid),
+  'pack-del':el=>{
+    const id=el.dataset.id, p=S.data.packs[id];
+    if(!p)return;
+    confirmDlg({title:'Excluir pacote',danger:true,okLabel:'Excluir',
+      msg:`Excluir o pacote de <b>${p.qty} aulas</b> (${brl(p.value)})? O saldo do aluno será recalculado.`,
+      onOk:()=>{delDoc('packs',id);renderMain();toast('Pacote excluído.')}});
+  },
+  'exp-new':()=>openExpenseForm(),
+  'exp-del':el=>{delExpense(el.dataset.doc,el.dataset.id);renderMain();toast('Gasto removido.')},
+  'exp-repasse':el=>{
+    const g=(settings().gyms||[]).find(x=>x.id===el.dataset.gym); if(!g)return;
+    const y=Number(el.dataset.y), m=Number(el.dataset.m), ym=y+'-'+pad(m);
+    const doIt=()=>{
+      addExpense({d:ym+'-'+pad(Math.min(new Date().getDate(),28)),cat:'Repasse',v:Number(el.dataset.v)||0,note:g.name+' · '+MONS[m-1]+'/'+y,gymId:g.id});
+      renderMain(); toast('Repasse lançado como gasto ✓');
+    };
+    const dup=monthExpenses(ym).find(e=>e.gymId===g.id);
+    if(dup)confirmDlg({title:'Repasse já lançado',okLabel:'Lançar de novo',
+      msg:`Já existe um repasse de <b>${esc(g.name)}</b> lançado neste mês (${brl(dup.v)}). Lançar outro mesmo assim?`,
+      onOk:doIt});
+    else doIt();
+  },
+  'rem-new':()=>openReminderForm(),
+  'rem-done':el=>{
+    const id=el.dataset.id, r=S.data.reminders[id]; if(!r)return;
+    putDoc('reminders',id,{...r,done:true});
+    renderMain(); toast('Lembrete concluído ✓');
+  },
+  'notif-ask':()=>{
+    if(!canNotify()){toast('Este navegador não suporta notificações.','warn');return}
+    Notification.requestPermission().then(p=>{
+      const h2=$('#overlay .layer .m-head h2');
+      if(h2&&h2.textContent==='Notificações e lembretes'){closeAllLayers();openNotifPrefs()}
+      renderMain();
+      toast(p==='granted'?'Notificações ativadas ✓':'Notificações não ativadas.');
+    });
+  },
+  'notif-prefs':()=>openNotifPrefs(),
+  'tpl-edit':()=>openTplEditor(),
+  'mg-methods':()=>openListManager({title:'Formas de recebimento',
+    hint:'Como seus alunos pagam: Pix, dinheiro, Nubank, Mercado Pago… Aparecem na hora de registrar um recebimento.',
+    items:settings().payMethods||[],onSave:l=>putCfg('settings',{...settings(),payMethods:l})}),
+  'mg-cats':()=>openListManager({title:'Categorias de gasto',
+    hint:'Organize seus gastos: deslocamento, combustível, alimentação, repasse…',
+    items:settings().expCats||[],onSave:l=>putCfg('settings',{...settings(),expCats:l})}),
+  'mg-gyms':()=>openGymManager(),
+  'wa-saldo':el=>{
+    const s=stById(el.dataset.sid); if(!s)return;
+    const pi=packInfo(s.id);
+    const href=waMsgHref(s.phone,fillTemplate(settings().templates.saldo,tplCtx(s,{saldo:String(Math.max(0,pi.left))})));
+    if(href)window.open(href,'_blank','noopener');
+  },
+  'sess-cancel-wa':el=>{
+    const{iso,sid,time}=el.dataset;
+    const s=stById(sid); if(!s)return;
+    setMark(sid,iso,time,null);
+    addExc({type:'cancel',date:iso,sid,time});
+    const href=waMsgHref(s.phone,fillTemplate(settings().templates.cancel,tplCtx(s,{data:fmtDM(iso),hora:time})));
+    closeAllLayers(); renderMain(); toast('Sessão cancelada — abrindo o WhatsApp…');
+    if(href)window.open(href,'_blank','noopener');
   },
   'eval-new':el=>openEvalForm(el.dataset.sid),
   'eval-del':el=>{
