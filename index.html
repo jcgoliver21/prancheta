@@ -886,7 +886,7 @@ function renderOnboarding(){
   let inner='';
   if(ob.step===0){
     inner=`<h2 style="font-size:21px;font-weight:800;margin-bottom:6px">Sua agenda de personal, organizada.</h2>
-    <p class="muted" style="margin-bottom:20px">Alunos, horários, presenças e pagamentos — tudo em um lugar, no computador e no celular. Leva menos de um minuto para configurar.</p>
+    <p class="muted" style="margin-bottom:20px">Alunos, horários, presenças e pagamentos — tudo em um lugar, ${S.cloud?'sincronizado no computador e no celular':'salvo neste aparelho (com backup para levar aonde quiser)'}. Leva menos de um minuto para configurar.</p>
     <button class="btn wide" data-a="ob-go">Começar</button>`;
   }else if(ob.step===1){
     inner=steps+`<div class="eyebrow" style="margin-bottom:4px">Passo 1 de 3</div>
