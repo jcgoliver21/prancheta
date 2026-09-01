@@ -2001,7 +2001,7 @@ function vAluno(){
   </div>
   <div class="stu-actions">
     ${wa?`<a class="btn sm soft" href="${wa}" target="_blank" rel="noopener">${I.phone} WhatsApp</a>`:''}
-    ${wa?`<button class="btn sm soft" data-a="send-plans" data-sid="${s.id}">${I.cash} Enviar planos</button>`:''}
+    ${wa?`<button class="btn sm soft" data-a="send-plans" data-sid="${s.id}">${I.box} Enviar pacotes</button>`:''}
     <button class="btn sm soft" data-a="stu-ficha" data-sid="${s.id}">${I.dl} Ficha</button>
     <button class="btn sm soft" data-a="stu-edit" data-sid="${s.id}">${I.edit} Editar</button>
     <button class="btn sm soft" data-a="stu-toggle" data-sid="${s.id}">${s.active===false?'Reativar':'Pausar'}</button>
@@ -2020,6 +2020,7 @@ function vAluno(){
   </div>
   ${s.tags?`<div class="row" style="gap:6px;margin-top:9px;flex-wrap:wrap">${String(s.tags).split(',').map(t2=>t2.trim()).filter(Boolean).map(t2=>`<span class="pill mut">#${esc(t2)}</span>`).join('')}</div>`:''}
   </div>
+  ${wa?msgCenterHTML(s):''}
   ${isConsult(s)?consultSectionHTML(s,wa):''}
   <div class="sec"><div class="row between"><div class="eyebrow">Horários fixos</div>
     <button class="btn sm ghost" data-a="stu-edit" data-sid="${s.id}">Editar horários</button></div>
@@ -2050,6 +2051,28 @@ function vAluno(){
   ${diarySectionHTML(s)}
   <div class="sec"><div class="eyebrow">Observações</div>
     <div class="card" style="min-height:52px;font-size:14px;white-space:pre-wrap">${s.notes?esc(s.notes):'<span class="muted small">Sem observações. Use “Editar” para anotar lesões, restrições, preferências…</span>'}</div></div>`;
+}
+/* central de mensagens: um botão para cada modelo, já preenchido e assinado */
+function msgCenterHTML(s){
+  const t=new Date(), y=t.getFullYear(), m=t.getMonth()+1;
+  const paid=(payDoc(s.id,y).months||{})[String(m)];
+  const btn=(a,label,icon,extra)=>`<button class="btn sm soft" data-a="${a}" data-sid="${s.id}" ${extra||''} style="justify-content:flex-start">${icon} ${label}</button>`;
+  const items=[];
+  if(Number(s.fee)>0&&s.plan!=='pacote')items.push(btn('wa-cobranca','Cobrança',I.cash));
+  if(paid)items.push(btn('wa-recibo','Recibo',I.check,`data-y="${y}" data-m="${m}"`));
+  if(s.plan==='pacote')items.push(btn('wa-saldo','Saldo de aulas',I.box));
+  if(isConsult(s))items.push(btn('wa-checkin','Check-in',I.bell));
+  items.push(btn('wa-treino','Enviar treino',I.chart));
+  items.push(btn('send-plans','Pacotes e promoções',I.cash));
+  items.push(btn('wa-boasvindas','Boas-vindas',I.sun));
+  if(s.birth)items.push(btn('wa-parabens','Parabéns 🎂',I.cake));
+  if((settings().files||[]).length)items.push(btn('send-file','Arquivo/link',I.dl));
+  return `<div class="sec"><div class="eyebrow">Mensagens de WhatsApp</div>
+    <div class="card" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px">
+      ${items.join('')}
+    </div>
+    <p class="hint" style="color:var(--ink2);font-size:11.5px;margin-top:7px">Cada botão abre o WhatsApp com a mensagem pronta e assinada — edite os textos em Mais → Mensagens do WhatsApp.</p>
+  </div>`;
 }
 function consultSectionHTML(s,wa){
   const doc=consultDoc(s.id);
@@ -2788,8 +2811,8 @@ function openPackForm(sid){
     <div class="m-body">
       ${(st.packPresets||[]).length?`<div class="f"><label>Pacote pré-definido</label><select id="${id}-preset">
         <option value="">Personalizado</option>
-        ${(st.packPresets||[]).map((p,i)=>`<option value="${i}">${p.qty} aulas — ${brl(p.price)}</option>`).join('')}
-      </select><div class="hint">Cadastre os seus em Mais → Pacotes e valores.</div></div>`:''}
+        ${(st.packPresets||[]).map((p,i)=>`<option value="${i}">${esc(presetName(p))} — ${p.qty} aulas · ${brl(p.price)}</option>`).join('')}
+      </select><div class="hint">Cadastre os seus em Mais → Pacotes, extras e promoções.</div></div>`:''}
       <div class="f2">
         <div class="f"><label>Quantidade de aulas *</label><select id="${id}-q">${[1,2,4,5,8,10,12,16,20,24,30].map(q=>`<option value="${q}" ${q===10?'selected':''}>${q} aulas</option>`).join('')}</select></div>
         <div class="f"><label>Valor total (R$) *</label><input id="${id}-v" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00"></div>
@@ -3010,73 +3033,84 @@ function openThemePicker(){
     <div class="m-foot"><button class="btn" data-a="layer-close">Concluído</button></div>
   </div>`);
 }
-function openPlansManager(){
-  const st=settings(), id=uid('pn');
-  const plans=clone(st.plans||[]), promos=clone(st.promos||[]);
+/* nome de exibição de um pacote pré-definido (compatível com os antigos sem nome) */
+const presetName=p=>p.name||(p.qty+' aulas');
+function openPresetsManager(){
+  const st=settings(), id=uid('pp');
+  const list=clone(st.packPresets||[]), promos=clone(st.promos||[]);
   openLayer(`<div class="modal wide" role="dialog">
-    <div class="m-head"><h2>Planos e promoções</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
+    <div class="m-head"><h2>Pacotes, extras e promoções</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
     <div class="m-body">
-      <p class="small muted" style="margin-bottom:11px">Monte sua tabela de planos para enviar aos alunos pelo WhatsApp — na hora de enviar você escolhe quais planos entram e se as promoções vão junto.</p>
-      <div class="eyebrow" style="margin-bottom:7px">Planos</div>
-      <div class="mglist" id="${id}-pl"></div>
+      <p class="small muted" style="margin-bottom:11px">Monte os pacotes que você vende — com nome, extras inclusos e valor. É a mesma tabela usada para lançar no aluno e para enviar pelo WhatsApp.</p>
+      <div class="eyebrow" style="margin-bottom:7px">Pacotes</div>
+      <div class="mglist" id="${id}-l"></div>
       <div class="card" style="margin:10px 0 18px;padding:12px">
-        <div class="f"><label>Nome do plano</label><input id="${id}-n" placeholder="Ex.: 3x por semana"></div>
+        <div class="f"><label>Nome do pacote</label><input id="${id}-n" placeholder="Ex.: Plano Evolução — 3x por semana"></div>
         <div class="f2">
-          <div class="f"><label>Valor (R$/mês)</label><input id="${id}-v" type="number" min="0" step="0.01" inputmode="decimal"></div>
-          <div class="f"><label>Descrição (opcional)</label><input id="${id}-d2" placeholder="Ex.: inclui avaliação mensal"></div>
+          <div class="f"><label>Aulas *</label><input id="${id}-q" type="number" min="1" inputmode="numeric" placeholder="Ex.: 12"></div>
+          <div class="f"><label>Valor (R$) *</label><input id="${id}-v" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00"></div>
         </div>
-        <button class="btn sm wide" id="${id}-addp">${I.plus} Adicionar plano</button>
+        <div class="f"><label>Extras inclusos (separados por vírgula)</label><input id="${id}-x" placeholder="Ex.: Funcional, Avaliação Física, Plano alimentar"></div>
+        <button class="btn sm wide" id="${id}-add">${I.plus} Adicionar pacote</button>
       </div>
       <div class="eyebrow" style="margin-bottom:7px">Promoções e descontos</div>
       <div class="mglist" id="${id}-pr"></div>
-      <div class="row" style="margin-top:10px"><input id="${id}-pt" class="grow" placeholder="Ex.: 10% off no plano trimestral até 30/09" style="background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px"><button class="btn sm" id="${id}-addr">${I.plus}</button></div>
+      <div class="row" style="margin-top:10px"><input id="${id}-pt" class="grow" placeholder="Ex.: 10% off no pacote de 24 aulas até 30/09" style="background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px"><button class="btn sm" id="${id}-addr">${I.plus}</button></div>
     </div>
     <div class="m-foot"><button class="btn soft" data-a="layer-close">Cancelar</button><button class="btn" id="${id}-ok">Salvar</button></div>
   </div>`);
   const paint=()=>{
-    $('#'+id+'-pl').innerHTML=plans.length?plans.map((p,i)=>`<div class="mgrow"><span class="grow">${esc(p.name)} — <b>${brl(p.price)}</b>${p.desc?'<div class="small muted" style="font-weight:500">'+esc(p.desc)+'</div>':''}</span><button class="icon-btn" data-k="pl" data-i="${i}">${I.x}</button></div>`).join(''):'<p class="small muted">Nenhum plano ainda.</p>';
+    $('#'+id+'-l').innerHTML=list.length?list.map((p,i)=>`<div class="mgrow"><span class="grow">📦 <b>${esc(presetName(p))}</b> — ${p.qty} aulas · ${brl(p.price)} <span class="small muted">(${brl(p.price/p.qty)}/aula)</span>
+      ${(p.extras||[]).length?'<div class="small muted" style="font-weight:500">+ '+p.extras.map(esc).join(' · ')+'</div>':''}</span>
+      <button class="icon-btn" data-k="pk" data-i="${i}">${I.x}</button></div>`).join(''):'<p class="small muted">Nenhum pacote definido.</p>';
     $('#'+id+'-pr').innerHTML=promos.length?promos.map((p,i)=>`<div class="mgrow"><span class="grow">🏷️ ${esc(p.text)}</span><button class="icon-btn" data-k="pr" data-i="${i}">${I.x}</button></div>`).join(''):'<p class="small muted">Nenhuma promoção ativa.</p>';
   };
   paint();
-  $('#'+id+'-pl').parentElement.addEventListener('click',e=>{
+  $('#'+id+'-l').parentElement.addEventListener('click',e=>{
     const b=e.target.closest('button[data-k]'); if(!b)return;
-    (b.dataset.k==='pl'?plans:promos).splice(Number(b.dataset.i),1); paint();
+    (b.dataset.k==='pk'?list:promos).splice(Number(b.dataset.i),1); paint();
   });
-  $('#'+id+'-addp').addEventListener('click',()=>{
-    const n=$('#'+id+'-n').value.trim(), v=Number($('#'+id+'-v').value);
-    if(!n||!(v>0)){toast('Informe nome e valor do plano.','warn');return}
-    plans.push({id:uid('pn'),name:n,price:v,desc:$('#'+id+'-d2').value.trim()});
-    $('#'+id+'-n').value='';$('#'+id+'-v').value='';$('#'+id+'-d2').value=''; paint();
+  $('#'+id+'-add').addEventListener('click',()=>{
+    const q=Number($('#'+id+'-q').value), v=Number($('#'+id+'-v').value);
+    if(!(q>0)||!(v>0)){toast('Informe aulas e valor.','warn');return}
+    const extras=$('#'+id+'-x').value.split(',').map(x=>x.trim()).filter(Boolean);
+    list.push({id:uid('pp'),name:$('#'+id+'-n').value.trim(),qty:q,price:v,extras});
+    list.sort((a,b)=>a.qty-b.qty);
+    $('#'+id+'-n').value='';$('#'+id+'-q').value='';$('#'+id+'-v').value='';$('#'+id+'-x').value=''; paint();
   });
   $('#'+id+'-addr').addEventListener('click',()=>{
     const t2=$('#'+id+'-pt').value.trim(); if(!t2)return;
     promos.push({id:uid('pm'),text:t2}); $('#'+id+'-pt').value=''; paint();
   });
   $('#'+id+'-ok').addEventListener('click',()=>{
-    putCfg('settings',{...settings(),plans,promos});
-    closeLayer(); renderMain(); toast('Planos salvos ✓');
+    putCfg('settings',{...settings(),packPresets:list,promos});
+    closeLayer(); renderMain(); toast('Pacotes salvos ✓');
   });
 }
+/* envia a tabela de PACOTES (com extras) + promoções pelo WhatsApp */
 function openSendPlans(sid){
   const s=stById(sid); if(!s)return;
-  const st=settings(), plans=st.plans||[], promos=st.promos||[];
-  if(!plans.length){toast('Cadastre seus planos primeiro em Mais → Planos e promoções.','warn');openPlansManager();return}
+  const st=settings(), packs=st.packPresets||[], promos=st.promos||[];
+  if(!packs.length){toast('Cadastre seus pacotes primeiro.','warn');openPresetsManager();return}
   const id=uid('sp');
   openLayer(`<div class="modal" role="dialog">
-    <div class="m-head"><h2>Enviar planos — ${esc(firstName(s.name))}</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
+    <div class="m-head"><h2>Enviar pacotes — ${esc(firstName(s.name))}</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
     <div class="m-body">
-      <div class="eyebrow" style="margin-bottom:8px">Quais planos enviar?</div>
-      ${plans.map((p,i)=>`<label class="checkline" style="padding:6px 0"><input type="checkbox" data-pi="${i}" checked>${esc(p.name)} — ${brl(p.price)}</label>`).join('')}
+      <div class="eyebrow" style="margin-bottom:8px">Quais pacotes enviar?</div>
+      ${packs.map((p,i)=>`<label class="checkline" style="padding:6px 0"><input type="checkbox" data-pi="${i}" checked>${esc(presetName(p))} — ${p.qty} aulas · ${brl(p.price)}</label>`).join('')}
       ${promos.length?`<label class="checkline" style="padding:10px 0 4px;border-top:1px solid var(--line);margin-top:8px"><input type="checkbox" id="${id}-promo" checked><b>Incluir promoções</b> (${promos.length})</label>`:''}
-      <div class="f" style="margin-top:12px"><label>Prévia da mensagem</label><textarea class="tpl" id="${id}-tx" style="min-height:150px"></textarea></div>
+      <div class="f" style="margin-top:12px"><label>Prévia da mensagem</label><textarea class="tpl" id="${id}-tx" style="min-height:170px"></textarea></div>
     </div>
     <div class="m-foot"><button class="btn soft" data-a="layer-close">Cancelar</button><button class="btn" id="${id}-ok">${I.msg} Enviar no WhatsApp</button></div>
   </div>`,{sheet:true});
   const build=()=>{
-    const sel=[...$$('#overlay input[data-pi]')].filter(c=>c.checked).map(c=>plans[Number(c.dataset.pi)]);
+    const sel=[...$$('#overlay input[data-pi]')].filter(c=>c.checked).map(c=>packs[Number(c.dataset.pi)]);
     const withPromo=$('#'+id+'-promo')?$('#'+id+'-promo').checked:false;
-    let txt='Olá, '+firstName(s.name)+'! 💪 Segue a minha tabela de planos:\n\n';
-    sel.forEach(p=>{txt+='• '+p.name+' — '+brl(p.price)+'/mês'+(p.desc?' ('+p.desc+')':'')+'\n'});
+    let txt='Olá, '+firstName(s.name)+'! 💪 Seguem os meus pacotes:\n\n';
+    sel.forEach(p=>{
+      txt+='📦 *'+presetName(p)+'* — '+p.qty+' aulas por '+brl(p.price)+'\n';
+      if((p.extras||[]).length)txt+='   inclui: '+p.extras.join(', ')+'\n';
+    });
     if(withPromo&&promos.length){txt+='\n🏷️ Promoções:\n';promos.forEach(p=>{txt+='• '+p.text+'\n'})}
     txt+='\nQualquer dúvida me chama!\n\nDo seu Personal '+((S.data.profile||{}).name||'');
     $('#'+id+'-tx').value=txt;
@@ -3087,40 +3121,6 @@ function openSendPlans(sid){
     const href=waMsgHref(s.phone,$('#'+id+'-tx').value);
     if(!href){toast('Este aluno não tem telefone cadastrado.','warn');return}
     closeAllLayers(); window.open(href,'_blank','noopener');
-  });
-}
-function openPresetsManager(){
-  const st=settings(), id=uid('pp');
-  const list=clone(st.packPresets||[]);
-  openLayer(`<div class="modal" role="dialog">
-    <div class="m-head"><h2>Pacotes e valores</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
-    <div class="m-body">
-      <p class="small muted" style="margin-bottom:11px">Defina os pacotes que você vende — na hora de lançar para um aluno, é só escolher.</p>
-      <div class="mglist" id="${id}-l"></div>
-      <div class="row" style="margin-top:12px">
-        <input id="${id}-q" type="number" min="1" placeholder="Aulas" style="width:84px;background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:9px 10px;font-size:14px">
-        <input id="${id}-v" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Valor (R$)" class="grow" style="min-width:0;background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px">
-        <button class="btn sm" id="${id}-add">${I.plus}</button>
-      </div>
-    </div>
-    <div class="m-foot"><button class="btn soft" data-a="layer-close">Cancelar</button><button class="btn" id="${id}-ok">Salvar</button></div>
-  </div>`);
-  const paint=()=>{$('#'+id+'-l').innerHTML=list.length?list.map((p,i)=>`<div class="mgrow"><span class="grow">📦 <b>${p.qty} aulas</b> — ${brl(p.price)} <span class="small muted">(${brl(p.price/p.qty)}/aula)</span></span><button class="icon-btn" data-i="${i}">${I.x}</button></div>`).join(''):'<p class="small muted">Nenhum pacote definido.</p>'};
-  paint();
-  $('#'+id+'-l').addEventListener('click',e=>{
-    const b=e.target.closest('button[data-i]'); if(!b)return;
-    list.splice(Number(b.dataset.i),1); paint();
-  });
-  $('#'+id+'-add').addEventListener('click',()=>{
-    const q=Number($('#'+id+'-q').value), v=Number($('#'+id+'-v').value);
-    if(!(q>0)||!(v>0)){toast('Informe aulas e valor.','warn');return}
-    list.push({id:uid('pp'),qty:q,price:v});
-    list.sort((a,b)=>a.qty-b.qty);
-    $('#'+id+'-q').value='';$('#'+id+'-v').value=''; paint();
-  });
-  $('#'+id+'-ok').addEventListener('click',()=>{
-    putCfg('settings',{...settings(),packPresets:list});
-    closeLayer(); renderMain(); toast('Pacotes salvos ✓');
   });
 }
 function openFilesManager(){
@@ -3537,6 +3537,15 @@ function vMais(){
     if(students().length&&(days===null||days>30))
       return`<button class="banner warnb" style="margin-top:12px;width:100%;text-align:left;cursor:pointer" data-a="exp"><span style="flex:none">💾</span><span class="grow">${days===null?'Você ainda não exportou um backup':'Seu último backup foi há '+days+' dias'} — toque para exportar agora.</span></button>`;
   }catch(e){} return ''})()}
+  <div class="sec"><div class="card" style="background:var(--accent-soft);border-color:transparent">
+    <div class="row" style="gap:13px;align-items:flex-start">
+      <span style="font-size:26px;flex:none">🤝</span>
+      <div class="grow">
+        <div class="row" style="gap:8px;flex-wrap:wrap"><b style="font-size:15px;color:var(--accent)">Programa de Afiliados</b><span class="pill warn">EM BREVE</span></div>
+        <p class="small" style="color:var(--ink2);margin-top:4px">Indique a Prancheta para outros personals e ganhe comissão por cada assinatura. Os links de divulgação e o painel de ganhos aparecerão aqui.</p>
+      </div>
+    </div>
+  </div></div>
   <div class="sec"><div class="eyebrow">Agenda</div><div class="card" style="padding:4px 16px">
     <button class="cfgrow" data-a="cfg-days"><span class="lead">${I.cal}</span><span class="grow"><div class="t">Dias de atuação</div><div class="d">${[1,2,3,4,5,6,0].filter(d=>st.days[d].on).map(d=>WDS[d]).join(', ')||'Nenhum dia ativo'}</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
     <button class="cfgrow" data-a="cfg-prefs"><span class="lead">${I.clock}</span><span class="grow"><div class="t">Sessões e grade</div><div class="d">${st.dur} min por sessão · grade a cada ${st.step} min</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
@@ -3544,8 +3553,7 @@ function vMais(){
   </div></div>
   <div class="sec"><div class="eyebrow">Trabalho</div><div class="card" style="padding:4px 16px">
     <button class="cfgrow" data-a="theme-pick"><span class="lead" style="background:var(--btn);color:var(--on-btn)">${I.sun}</span><span class="grow"><div class="t">Tema do app</div><div class="d">${esc((THEMES[Number(st.theme)||0]||THEMES[0])[0])} · 20 cores disponíveis</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
-    <button class="cfgrow" data-a="mg-plans"><span class="lead">${I.cash}</span><span class="grow"><div class="t">Planos e promoções</div><div class="d">${(st.plans||[]).length?(st.plans||[]).length+' plano(s)'+((st.promos||[]).length?' · '+(st.promos||[]).length+' promoção(ões)':''):'Monte sua tabela para enviar aos alunos'}</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
-    <button class="cfgrow" data-a="mg-presets"><span class="lead">${I.box}</span><span class="grow"><div class="t">Pacotes e valores</div><div class="d">${(st.packPresets||[]).length?(st.packPresets||[]).map(p=>p.qty+' aulas '+brl(p.price)).join(' · '):'Defina os pacotes que você vende'}</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
+    <button class="cfgrow" data-a="mg-presets"><span class="lead">${I.box}</span><span class="grow"><div class="t">Pacotes, extras e promoções</div><div class="d">${(st.packPresets||[]).length?(st.packPresets||[]).map(p=>esc(presetName(p))).join(' · ')+((st.promos||[]).length?' · '+(st.promos||[]).length+' promoção(ões)':''):'Nome, aulas, valor e extras (Funcional, Avaliação…)'}</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
     <button class="cfgrow" data-a="send-file"><span class="lead">${I.dl}</span><span class="grow"><div class="t">Arquivos e links</div><div class="d">${(st.files||[]).length?(st.files||[]).map(f=>esc(f.name)).join(' · '):'Cartão virtual, CREF, contrato — para enviar com 1 toque'}</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
     <button class="cfgrow" data-a="mg-workouts"><span class="lead">${I.chart}</span><span class="grow"><div class="t">Modelos de treino</div><div class="d">${(st.workoutTpls||[]).length?(st.workoutTpls||[]).length+' modelo(s) para enviar na consultoria':'Biblioteca de treinos para envio rápido'}</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
     <button class="cfgrow" data-a="mg-recexp"><span class="lead">${I.wallet}</span><span class="grow"><div class="t">Gastos fixos mensais</div><div class="d">${(st.recurringExp||[]).length?(st.recurringExp||[]).length+' fixo(s) · '+brl((st.recurringExp||[]).reduce((a,r)=>a+(Number(r.v)||0),0))+'/mês':'Aluguel de espaço, apps, contador…'}</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
@@ -3965,7 +3973,6 @@ const A={
     closeAllLayers(); openThemePicker(); renderMain();
     toast('Tema '+THEMES[i][0]+' aplicado ✓');
   },
-  'mg-plans':()=>openPlansManager(),
   'send-plans':el=>openSendPlans(el.dataset.sid),
   'mg-presets':()=>openPresetsManager(),
   'mg-files':()=>{closeAllLayers();openFilesManager()},
@@ -4014,6 +4021,12 @@ const A={
     const cur=findSess(iso,sid,time,'extra');
     addExc({type:'extra',date:nd,sid,time,w:(cur&&cur.w)||''});
     closeAllLayers(); renderMain(); toast('Sessão repetida em '+fmtDM(nd)+' ✓');
+  },
+  'wa-cobranca':el=>{
+    const s=stById(el.dataset.sid); if(!s)return;
+    const t=new Date();
+    const href=waCobrancaHref(s,t.getFullYear(),t.getMonth()+1);
+    if(href)window.open(href,'_blank','noopener');
   },
   'wa-checkin':el=>{
     const s=stById(el.dataset.sid); if(!s)return;
