@@ -125,6 +125,13 @@ svg{display:block}
 .tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
 @media(min-width:700px){.tiles{grid-template-columns:repeat(4,1fr)}}
 .tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;box-shadow:var(--shadow)}
+button.tile{text-align:left;cursor:pointer;transition:border-color .12s,transform .12s;width:100%}
+button.tile:hover{border-color:var(--accent)}
+button.tile:active{transform:scale(.985)}
+.qact{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.qact button{display:grid;justify-items:center;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 4px;font-size:11px;font-weight:700;color:var(--ink);box-shadow:var(--shadow);cursor:pointer}
+.qact button svg{width:19px;height:19px;color:var(--accent)}
+.qact button:hover{border-color:var(--accent)}
 .tile .v{font-size:26px;line-height:1.15;margin-top:2px}
 .tile .l{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink2)}
 .tile .d{font-size:11.5px;color:var(--ink2);margin-top:2px}
@@ -1559,8 +1566,25 @@ function vHoje(){
   const bd=students().filter(s=>s.active!==false&&s.birth&&s.birth.slice(5)===iso.slice(5));
   const upcoming=birthdaysOf(t.getMonth()+1).filter(s=>s.bday>=t.getDate()).slice(0,3);
   const wk=weekOf(iso);
-  let wkTotal=0,wkDone=0;
-  for(const wiso of wk){const dd=daySessions(wiso).list;wkTotal+=dd.length;dd.forEach(it=>{const mm=getMark(it.sid,wiso,it.time);if(mm&&mm.s==='ok')wkDone++})}
+  let wkTotal=0,wkDone=0,wkMiss=0;
+  for(const wiso of wk){const dd=daySessions(wiso).list;wkTotal+=dd.length;dd.forEach(it=>{const mm=getMark(it.sid,wiso,it.time);if(mm&&mm.s==='ok')wkDone++;else if(mm&&mm.s==='miss')wkMiss++})}
+  /* novos indicadores da Home */
+  const ymNow=iso.slice(0,7);
+  const dueToday=activeStudents().filter(s=>s.plan!=='pacote'&&Number(s.fee)>0&&Number(s.dueDay||5)===t.getDate()&&['pendente','atrasado'].includes(payStatus(s.id,t.getFullYear(),t.getMonth()+1).st));
+  const dueTodayTotal=dueToday.reduce((a,s)=>a+(Number(s.fee)||0),0);
+  const gastosMes=expTotal(ymNow);
+  const lucroMes=rev.got-gastosMes;
+  let aulasMes=0;
+  for(const[idd,doc2]of Object.entries(S.data.attendance)){
+    if(!idd.endsWith('_'+ymNow)||!doc2.marks)continue;
+    for(const v of Object.values(doc2.marks))if(v.s==='ok')aulasMes++;
+  }
+  let topStreak=null;
+  for(const s of activeStudents()){const n=streakOf(s.id);if(n>=3&&(!topStreak||n>topStreak.n))topStreak={s,n}}
+  const waitN=(settings().waitlist||[]).length;
+  const goal=Number(settings().goalRevenue)||0;
+  const goalPct=goal?Math.min(100,Math.round(rev.got/goal*100)):0;
+  const noteToday=dayNote(iso);
   const nowMin=t.getHours()*60+t.getMinutes();
   const next=list.find(it=>toMin(it.time)>nowMin&&!getMark(it.sid,iso,it.time));
   const nextS=next?stById(next.sid):null;
@@ -1597,19 +1621,43 @@ function vHoje(){
     a.none?`<b>${esc(a.s.name)}</b> está sem pacote de aulas ativo.`
     :a.out?`<b>${esc(a.s.name)}</b> está com o pacote esgotado${a.left<0?' ('+(-a.left)+' aula(s) além do saldo)':''} — hora de renovar!`
     :`<b>${esc(a.s.name)}</b> tem só <b>${a.left}</b> aula(s) restantes no pacote.`}</span></button>`).join('')}
-  <div class="tiles">
-    <div class="tile"><div class="l">Sessões hoje</div><div class="v big-num">${list.length}</div><div class="d">${done} concluída${done===1?'':'s'}</div></div>
-    <div class="tile"><div class="l">Esta semana</div><div class="v big-num">${wkTotal}</div><div class="d">${wkDone} concluída${wkDone===1?'':'s'}</div></div>
-    <div class="tile"><div class="l">Alunos ativos</div><div class="v big-num">${activeStudents().length}</div><div class="d">${students().length-activeStudents().length} pausado(s)</div></div>
-    <div class="tile"><div class="l">Ocupação semanal</div><div class="v big-num">${occ.pct}%</div><div class="bar" style="margin-top:7px"><i class="acc" style="width:${occ.pct}%"></i></div></div>
-    <div class="tile"><div class="l">Recebido no mês</div><div class="v big-num" style="font-size:19px;padding-top:5px">${brl(rev.got)}</div><div class="d">de ${brl(rev.exp)} previstos</div></div>
+  <div class="qact">
+    <button data-a="extra-new">${I.plus}<span>Avulsa</span></button>
+    <button data-a="go-fin" data-tab="receber">${I.cash}<span>Receber</span></button>
+    <button data-a="exp-quick">${I.wallet}<span>Gasto</span></button>
+    <button data-a="rem-new">${I.bell}<span>Lembrete</span></button>
   </div>
+  <div class="tiles">
+    <button class="tile" data-a="go-agenda"><div class="l">Sessões hoje</div><div class="v big-num">${list.length}</div><div class="d">${done} concluída${done===1?'':'s'}</div></button>
+    <button class="tile" data-a="go-agenda"><div class="l">Esta semana</div><div class="v big-num">${wkTotal}</div><div class="d">${wkDone} concluída${wkDone===1?'':'s'}</div></button>
+    <button class="tile" data-a="go-alunos"><div class="l">Alunos ativos</div><div class="v big-num">${activeStudents().length}</div><div class="d">${students().length-activeStudents().length} pausado(s)</div></button>
+    <button class="tile" data-a="go-fin" data-tab="receber"><div class="l">Recebido no mês</div><div class="v big-num" style="font-size:19px;padding-top:5px">${brl(rev.got)}</div><div class="d">de ${brl(rev.exp)} previstos</div></button>
+    <button class="tile" data-a="go-fin" data-tab="rel"><div class="l">Lucro do mês</div><div class="v big-num" style="font-size:19px;padding-top:5px;color:${lucroMes>=0?'var(--ok)':'var(--bad)'}">${brl(lucroMes)}</div><div class="d">receita − gastos</div></button>
+    <button class="tile" data-a="go-fin" data-tab="gastos"><div class="l">Gastos do mês</div><div class="v big-num" style="font-size:19px;padding-top:5px;color:${gastosMes?'var(--bad)':'inherit'}">${brl(gastosMes)}</div><div class="d">toque para lançar</div></button>
+    <button class="tile" data-a="go-fin" data-tab="receber"><div class="l">A receber hoje</div><div class="v big-num" style="${dueToday.length?'color:var(--warn)':''}">${dueToday.length}</div><div class="d">${dueToday.length?brl(dueTodayTotal)+' vencendo hoje':'nenhum vencimento hoje'}</div></button>
+    <button class="tile" data-a="go-alunos" data-sort="freq"><div class="l">Faltas na semana</div><div class="v big-num" style="${wkMiss?'color:var(--bad)':''}">${wkMiss}</div><div class="d">${wkDone}✓ na semana</div></button>
+    <button class="tile" data-a="go-fin" data-tab="rel"><div class="l">Aulas no mês</div><div class="v big-num">${aulasMes}</div><div class="d">${aulasMes?brl(aulasMes?rev.got/aulasMes:0)+' por aula':'presenças confirmadas'}</div></button>
+    <button class="tile" data-a="go-agenda"><div class="l">Ocupação semanal</div><div class="v big-num">${occ.pct}%</div><div class="bar" style="margin-top:7px"><i class="acc" style="width:${occ.pct}%"></i></div></button>
+  </div>
+  ${goal?`<button class="card" style="width:100%;text-align:left;cursor:pointer;margin-top:12px;padding:12px 16px" data-a="go-fin" data-tab="rel">
+    <div class="row between small" style="margin-bottom:6px"><b>🎯 Meta do mês: ${brl(goal)}</b><span class="mono muted">${goalPct}%</span></div>
+    <div class="bar"><i class="${rev.got>=goal?'':'acc'}" style="width:${goalPct}%"></i></div>
+  </button>`:''}
+  ${noteToday?`<button class="banner warnb" style="width:100%;text-align:left;cursor:pointer;margin-top:12px" data-a="day-note" data-iso="${iso}"><span style="flex:none">📌</span><span class="grow">Nota de hoje: <b>${esc(noteToday)}</b></span>${I.edit.replace('<svg','<svg width="15" height="15" style="flex:none;opacity:.7"')}</button>`:''}
   <div class="sec"><div class="row between"><div class="eyebrow">Treinos de hoje</div>
     ${pastUnmarked.length?`<button class="btn sm ghost" data-a="mark-past" data-iso="${iso}">${I.check} Presentes até agora (${pastUnmarked.length})</button>`:''}</div>
     ${list.length||cancelled.length?`<div class="lst">${list.map(it=>sessCard(iso,it)).join('')}${cancelled.map(it=>sessCancelCard(iso,it)).join('')}</div>`
       :`<div class="empty">${I.sun}<div class="big">Dia livre</div>Nenhum treino agendado para hoje.</div>`}
-    ${tmList.length?`<p class="small muted" style="margin-top:10px">Amanhã: ${tmList.length} sessão(ões), primeira às ${tmList[0].time}.</p>`:''}
   </div>
+  ${tmList.length?`<div class="sec"><div class="eyebrow">Amanhã · ${fmtDM(tmIso)}</div>
+    <button class="card" style="width:100%;text-align:left;cursor:pointer;padding:10px 14px" data-a="go-date" data-iso="${tmIso}">
+      ${tmList.slice(0,3).map(it=>{const s2=stById(it.sid);return`<div class="row" style="padding:5px 0"><span class="mono" style="font-weight:800;width:46px">${it.time}</span><span class="grow" style="font-weight:600;font-size:13.5px">${esc(s2?s2.name:'')}</span>${it.w?`<span class="small muted">${esc(it.w)}</span>`:''}</div>`}).join('')}
+      ${tmList.length>3?`<div class="small muted" style="padding:5px 0">+ ${tmList.length-3} sessão(ões) — toque para ver o dia</div>`:''}
+    </button></div>`:''}
+  ${(topStreak||waitN)?`<div class="sec"><div class="eyebrow">Destaques</div><div class="card" style="padding:6px 14px">
+    ${topStreak?`<button class="row" style="padding:8px 0;width:100%;text-align:left;cursor:pointer" data-a="stu" data-sid="${topStreak.s.id}"><span style="flex:none">🔥</span><span class="grow" style="font-size:13.5px;font-weight:600"><b>${esc(topStreak.s.name)}</b> está com ${topStreak.n} presenças seguidas</span>${I.chr.replace('<svg','<svg width="14" height="14" style="color:var(--ink2)"')}</button>`:''}
+    ${waitN?`<button class="row" style="padding:8px 0;width:100%;text-align:left;cursor:pointer" data-a="waitlist"><span style="flex:none">👥</span><span class="grow" style="font-size:13.5px;font-weight:600">${waitN} pessoa(s) na lista de espera</span>${I.chr.replace('<svg','<svg width="14" height="14" style="color:var(--ink2)"')}</button>`:''}
+  </div></div>`:''}
   ${cks.length?`<div class="sec"><div class="eyebrow">Check-ins de consultoria hoje</div><div class="lst">
     ${cks.map(s=>{const done=checkinDoneToday(s.id);const wa2=whatsHref(s.phone);
       return`<div class="sess ${done?'done':''}">
@@ -1624,7 +1672,7 @@ function vHoje(){
     ${remindersHTML()}
   </div>
   ${upcoming.length?`<div class="sec"><div class="eyebrow">Aniversários do mês</div><div class="card" style="padding:8px 14px">
-    ${upcoming.map(s=>`<div class="row" style="padding:7px 0"><span style="width:22px">🎂</span><span class="grow" style="font-weight:600">${esc(s.name)}${s.bday-t.getDate()<=6?' <span class="pill warn" style="font-size:10px">esta semana 🎈</span>':''}</span><span class="muted small mono">${pad(s.bday)}/${pad(t.getMonth()+1)}</span></div>`).join('')}
+    ${upcoming.map(s=>`<button class="row" style="padding:7px 0;width:100%;text-align:left;cursor:pointer" data-a="stu" data-sid="${s.id}"><span style="width:22px">🎂</span><span class="grow" style="font-weight:600">${esc(s.name)}${s.bday-t.getDate()<=6?' <span class="pill warn" style="font-size:10px">esta semana 🎈</span>':''}</span><span class="muted small mono">${pad(s.bday)}/${pad(t.getMonth()+1)}</span></button>`).join('')}
   </div></div>`:''}`;
 }
 function remindersHTML(){
@@ -4014,6 +4062,17 @@ const A={
   'mg-gyms':()=>openGymManager(),
   /* ===== v4 ===== */
   'go-date':el=>{S.ui.view='agenda';S.ui.selDate=el.dataset.iso;renderMain();window.scrollTo(0,0)},
+  'go-agenda':()=>{S.ui.view='agenda';S.ui.selDate=todayISO();renderMain();window.scrollTo(0,0)},
+  'go-alunos':el=>{S.ui.view='alunos';S.ui.filter='ativos';if(el&&el.dataset.sort)S.ui.sort=el.dataset.sort;renderMain();window.scrollTo(0,0)},
+  'go-fin':el=>{
+    S.ui.view='fin'; S.ui.finTab=(el&&el.dataset.tab)||'receber';
+    const t=new Date(); S.ui.finY=t.getFullYear(); S.ui.finM=t.getMonth()+1;
+    renderMain(); window.scrollTo(0,0);
+  },
+  'exp-quick':()=>{
+    const t=new Date(); S.ui.finY=t.getFullYear(); S.ui.finM=t.getMonth()+1;
+    openExpenseForm();
+  },
   'go-pick':()=>openDatePicker(S.ui.selDate,iso=>{S.ui.selDate=iso;renderMain()}),
   'copy-day':el=>shareText(agendaText([el.dataset.iso||S.ui.selDate]),'Agenda do dia copiada ✓'),
   'copy-week':()=>shareText(agendaText(weekOf(S.ui.selDate)),'Agenda da semana copiada ✓'),
