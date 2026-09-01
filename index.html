@@ -1041,6 +1041,20 @@ function birthdaysOf(mo){
   return students().filter(s=>s.birth&&Number(s.birth.slice(5,7))===mo&&s.active!==false)
     .map(s=>({...s,bday:Number(s.birth.slice(8,10))})).sort((a,b)=>a.bday-b.bday);
 }
+/* aniversários nos próximos N dias (cruzando a virada de mês/ano), com contagem
+   regressiva e a idade que o aluno completa */
+function upcomingBirthdays(days){
+  const today=dateOf(todayISO()), out=[];
+  for(const s of activeStudents()){
+    if(!s.birth||!/^\d{4}-\d{2}-\d{2}$/.test(s.birth))continue;
+    const[by,bm,bd]=s.birth.split('-').map(Number);
+    let next=new Date(today.getFullYear(),bm-1,bd,12);
+    if(next<today)next=new Date(today.getFullYear()+1,bm-1,bd,12);
+    const diff=Math.round((next-today)/86400000);
+    if(diff<=(days||30))out.push({s,diff,date:isoOf(next),turns:next.getFullYear()-by});
+  }
+  return out.sort((a,b)=>a.diff-b.diff);
+}
 function whatsHref(phone){
   let d=String(phone||'').replace(/\D/g,'');
   if(!d)return null;
@@ -1564,7 +1578,7 @@ function vHoje(){
   const t=new Date(), occ=occupancy(), rev=monthRevenue(t.getFullYear(),t.getMonth()+1);
   let done=0; list.forEach(it=>{const m=getMark(it.sid,iso,it.time);if(m&&m.s==='ok')done++});
   const bd=students().filter(s=>s.active!==false&&s.birth&&s.birth.slice(5)===iso.slice(5));
-  const upcoming=birthdaysOf(t.getMonth()+1).filter(s=>s.bday>=t.getDate()).slice(0,3);
+  const upcoming=upcomingBirthdays(30).filter(b2=>b2.diff>0).slice(0,4);
   const wk=weekOf(iso);
   let wkTotal=0,wkDone=0,wkMiss=0;
   for(const wiso of wk){const dd=daySessions(wiso).list;wkTotal+=dd.length;dd.forEach(it=>{const mm=getMark(it.sid,wiso,it.time);if(mm&&mm.s==='ok')wkDone++;else if(mm&&mm.s==='miss')wkMiss++})}
@@ -1616,7 +1630,8 @@ function vHoje(){
     </button>`).join('')}
     ${newMonth?`<div class="row" style="padding:8px 0"><span style="flex:none">🌱</span><span class="grow small" style="font-weight:600;color:var(--ok)">${newMonth} aluno(s) novo(s) este mês</span></div>`:''}
   </div>`:''}
-  ${bd.map(s=>`<div class="banner" style="margin-bottom:12px"><span style="flex:none">🎉</span><span class="grow">Hoje é aniversário de <b>${esc(s.name)}</b>!</span>${whatsHref(s.phone)?`<button class="btn sm" data-a="wa-parabens" data-sid="${s.id}" style="flex:none">Parabenizar</button>`:''}</div>`).join('')}
+  ${bd.map(s=>{const age2=s.birth?t.getFullYear()-Number(s.birth.slice(0,4)):null;
+    return`<div class="banner" style="margin-bottom:12px"><span style="flex:none">🎉</span><span class="grow">Hoje é aniversário de <b>${esc(s.name)}</b>${age2?' — faz '+age2+' anos':''}!</span>${whatsHref(s.phone)?`<button class="btn sm" data-a="wa-parabens" data-sid="${s.id}" style="flex:none">🎂 Parabenizar</button>`:''}</div>`}).join('')}
   ${packAlerts().slice(0,3).map(a=>`<button class="banner warnb" style="margin-bottom:12px;width:100%;text-align:left;cursor:pointer" data-a="stu" data-sid="${a.s.id}"><span style="flex:none">📦</span><span class="grow">${
     a.none?`<b>${esc(a.s.name)}</b> está sem pacote de aulas ativo.`
     :a.out?`<b>${esc(a.s.name)}</b> está com o pacote esgotado${a.left<0?' ('+(-a.left)+' aula(s) além do saldo)':''} — hora de renovar!`
@@ -1671,8 +1686,18 @@ function vHoje(){
     <button class="btn sm ghost" data-a="rem-new">${I.plus} Lembrete</button></div>
     ${remindersHTML()}
   </div>
-  ${upcoming.length?`<div class="sec"><div class="eyebrow">Aniversários do mês</div><div class="card" style="padding:8px 14px">
-    ${upcoming.map(s=>`<button class="row" style="padding:7px 0;width:100%;text-align:left;cursor:pointer" data-a="stu" data-sid="${s.id}"><span style="width:22px">🎂</span><span class="grow" style="font-weight:600">${esc(s.name)}${s.bday-t.getDate()<=6?' <span class="pill warn" style="font-size:10px">esta semana 🎈</span>':''}</span><span class="muted small mono">${pad(s.bday)}/${pad(t.getMonth()+1)}</span></button>`).join('')}
+  ${upcoming.length?`<div class="sec"><div class="eyebrow">Próximos aniversários</div><div class="card" style="padding:8px 14px">
+    ${upcoming.map(b2=>{const s=b2.s;
+      const when=b2.diff===1?'amanhã':'em '+b2.diff+' dias';
+      return`<div class="row" style="padding:7px 0">
+      <button class="row grow" style="text-align:left;cursor:pointer;gap:10px" data-a="stu" data-sid="${s.id}">
+        <span style="width:22px;flex:none">🎂</span>
+        <span class="grow"><span style="font-weight:600">${esc(s.name)}</span>
+          <div class="small muted">faz <b>${b2.turns} anos</b> ${when}${b2.diff<=7?' 🎈':''}</div></span>
+        <span class="muted small mono" style="flex:none">${fmtDM(b2.date)}</span>
+      </button>
+      ${whatsHref(s.phone)?`<button class="icon-btn" style="width:32px;height:32px" data-a="wa-parabens" data-sid="${s.id}" title="Enviar parabéns no WhatsApp">${I.msg}</button>`:''}
+    </div>`}).join('')}
   </div></div>`:''}`;
 }
 function remindersHTML(){
@@ -2129,7 +2154,11 @@ function msgCenterHTML(s){
   items.push(btn('wa-treino','Enviar treino',I.chart));
   items.push(btn('send-plans','Pacotes e promoções',I.cash));
   items.push(btn('wa-boasvindas','Boas-vindas',I.sun));
-  if(s.birth)items.push(btn('wa-parabens','Parabéns 🎂',I.cake));
+  if(s.birth){
+    const b2=upcomingBirthdays(365).find(x=>x.s.id===s.id);
+    const hoje=s.birth.slice(5)===todayISO().slice(5);
+    items.push(btn('wa-parabens','Parabéns 🎂'+(hoje?' — é HOJE!':b2&&b2.diff<=7?' (em '+b2.diff+'d)':''),I.cake));
+  }
   if((settings().files||[]).length)items.push(btn('send-file','Arquivo/link',I.dl));
   return `<div class="sec"><div class="eyebrow">Mensagens de WhatsApp</div>
     <div class="card" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px">
