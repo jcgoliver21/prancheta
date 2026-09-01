@@ -2816,8 +2816,8 @@ function finRelatorio(y,m){
   }).filter(x=>x.tot>0).sort((a,b)=>b.tot-a.tot).slice(0,3);
   return `<div class="row between" style="margin-bottom:10px;flex-wrap:wrap;gap:8px"><span class="small muted">${cmpPct!==null?`Receita ${cmpPct>=0?'+':''}${cmpPct}% vs ${MONS[(m-2+12)%12]}`:''}</span>
     <div class="row" style="gap:7px">
-      <button class="btn sm ghost" data-a="csv-export" data-y="${y}" data-m="${m}">${I.dl} CSV do mês</button>
-      <button class="btn sm ghost" data-a="csv-year" data-y="${y}">${I.dl} CSV do ano</button>
+      <button class="btn sm ghost" data-a="pdf-month" data-y="${y}" data-m="${m}">${I.dl} PDF do mês</button>
+      <button class="btn sm ghost" data-a="pdf-year" data-y="${y}">${I.dl} PDF do ano</button>
     </div></div>
   ${goal?`<div class="card" style="margin-bottom:12px;padding:12px 16px"><div class="row between small" style="margin-bottom:6px"><b>Meta do mês: ${brl(goal)}</b><span class="row" style="gap:8px"><span class="mono muted">${goalPct}%</span><button class="icon-btn" style="width:26px;height:26px" data-a="goal-edit" title="Editar meta">${I.edit}</button></span></div>
     <div class="bar"><i class="${cur.rec>=goal?'':'acc'}" style="width:${goalPct}%"></i></div></div>`
@@ -3288,35 +3288,218 @@ function openSendFile(){
     closeAllLayers(); if(href)window.open(href,'_blank','noopener');
   });
 }
-async function exportCSV(y,m){
-  const ym=y+'-'+pad(m);
-  const sep=';', lines=['tipo'+sep+'data'+sep+'descricao'+sep+'categoria/forma'+sep+'valor'];
-  const csvNum=v=>String((Number(v)||0).toFixed(2)).replace('.',',');
-  const q=s2=>'"'+String(s2||'').replace(/"/g,'""')+'"';
-  for(const s of students()){
-    const rec=(payDoc(s.id,y).months||{})[String(m)];
-    if(rec)lines.push(['receita',rec.at,q('Mensalidade '+s.name),q(rec.via||''),csvNum(recAmt(rec,s))].join(sep));
+/* ===== gerador de PDF (JS puro, sem bibliotecas) =====
+   Saída 100% ASCII: acentos viram escapes octais WinAnsi, então o arquivo
+   sobrevive intacto tanto ao Blob quanto à capability downloads. */
+function pdfEscape(s){
+  s=String(s??'')
+    .replace(/[✓✔]/g,'OK').replace(/[✗✘]/g,'X')
+    .replace(/[“”]/g,'"').replace(/[‘’]/g,"'")
+    .replace(/—|–/g,'-').replace(/·|•/g,'-').replace(/…/g,'...')
+    .replace(/[\u{1F300}-\u{1FAFF}☀-➿️]/gu,'');
+  let out='';
+  for(const ch of s){
+    const c=ch.charCodeAt(0);
+    if(ch==='\\'||ch==='('||ch===')')out+='\\'+ch;
+    else if(c>=32&&c<127)out+=ch;
+    else if(c>=160&&c<=255)out+='\\'+c.toString(8).padStart(3,'0');
+    else out+=' ';
   }
-  for(const p of Object.values(S.data.packs))
-    if((p.at||'').slice(0,7)===ym){const s=stById(p.sid);lines.push(['receita',p.at,q('Pacote '+(p.qty)+' aulas '+(s?s.name:'')),q(p.via||''),csvNum(p.value)].join(sep))}
-  for(const e2 of monthExpenses(ym))
-    lines.push(['gasto',e2.d,q(e2.note||e2.cat),q(e2.cat),csvNum(-(Number(e2.v)||0))].join(sep));
-  const csv='﻿'+lines.join('\r\n');
+  return out;
+}
+function pdfBuilder(){
+  const PW=595, PH=842, M=46;
+  const pages=[]; let ops=null, y=0;
+  const np=()=>{ops=[];pages.push(ops);y=PH-M;};
+  np();
+  const ensure=need=>{if(y-need<M+14)np()};
+  const put=(x,str,size,bold)=>{ops.push('BT /F'+(bold?'B':'R')+' '+size+' Tf '+x.toFixed(1)+' '+y.toFixed(1)+' Td ('+pdfEscape(str)+') Tj ET')};
+  const clip=(str,x,xNext,size)=>{const max=Math.max(3,Math.floor((xNext-x-6)/(size*0.52)));str=String(str??'');return str.length>max?str.slice(0,max-1)+'.':str};
+  return{
+    h1(t){ensure(34);put(M,t,17,true);y-=22},
+    sub(t){ensure(16);put(M,t,9.5,false);y-=13},
+    h2(t){ensure(30);y-=8;put(M,t,12,true);y-=15},
+    gap(n){y-=n},
+    rule(){ensure(10);ops.push('0.72 0.75 0.80 RG 0.7 w '+M+' '+(y+3.5).toFixed(1)+' m '+(PW-M)+' '+(y+3.5).toFixed(1)+' l S');y-=9},
+    /* cols: [{x, t, next?}] — next = x da próxima coluna, para truncar */
+    row(cols,opt){
+      const size=(opt&&opt.size)||9.5;
+      ensure(15);
+      for(const c of cols)put(c.x,c.next?clip(c.t,c.x,c.next,size):String(c.t??''),size,!!(opt&&opt.bold));
+      y-=13;
+    },
+    kv(label,value){this.row([{x:M,t:label},{x:M+200,t:value}],{})},
+    finish(){
+      /* obj 1 catalog, 2 pages, 3 FR, 4 FB; depois (content,page) por página */
+      const objs=['<< /Type /Catalog /Pages 2 0 R >>','PAGES',
+        '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
+        '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>'];
+      const kids=[];
+      for(const pOps of pages){
+        const content='0.07 0.09 0.13 rg\n'+pOps.join('\n');
+        objs.push('<< /Length '+content.length+' >>\nstream\n'+content+'\nendstream');
+        const cNum=objs.length;
+        objs.push('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 '+PW+' '+PH+'] /Resources << /Font << /FR 3 0 R /FB 4 0 R >> >> /Contents '+cNum+' 0 R >>');
+        kids.push(objs.length+' 0 R');
+      }
+      objs[1]='<< /Type /Pages /Kids ['+kids.join(' ')+'] /Count '+pages.length+' >>';
+      let out='%PDF-1.4\n'; const off=[];
+      objs.forEach((s,i)=>{off.push(out.length);out+=(i+1)+' 0 obj\n'+s+'\nendobj\n'});
+      const xref=out.length;
+      out+='xref\n0 '+(objs.length+1)+'\n0000000000 65535 f \n'
+        +off.map(o=>String(o).padStart(10,'0')+' 00000 n \n').join('')
+        +'trailer\n<< /Size '+(objs.length+1)+' /Root 1 0 R >>\nstartxref\n'+xref+'\n%%EOF';
+      return out;
+    }
+  };
+}
+async function downloadPDF(filename,ascii){
   let dl=null;
   try{ if(window.claude&&window.claude.use)dl=await window.claude.use('downloads'); }catch(e){}
   if(dl){
-    try{ await dl.save({filename:'prancheta-financeiro-'+ym+'.csv',data:csv}); toast('CSV exportado ✓'); return; }
+    try{ await dl.save({filename,data:ascii}); toast('PDF salvo ✓'); return; }
     catch(e){ if(e&&(e.code==='declined'||e.code==='rate_limited'))return; }
   }
   try{
     const a=document.createElement('a');
-    a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
-    a.download='prancheta-financeiro-'+ym+'.csv';
+    a.href=URL.createObjectURL(new Blob([ascii],{type:'application/pdf'}));
+    a.download=filename;
     document.body.appendChild(a); a.click(); a.remove();
-    toast('CSV baixado ✓');
-  }catch(e){
-    try{await navigator.clipboard.writeText(csv);toast('CSV copiado para a área de transferência ✓')}catch(e2){toast('Não foi possível exportar.','bad')}
+    toast('PDF baixado ✓');
+  }catch(e){ toast('Não foi possível gerar o PDF.','bad'); }
+}
+function pdfHeader(P,title,subtitle){
+  P.h1('Prancheta — '+title);
+  const p=S.data.profile||{};
+  P.sub((p.name||'')+(p.cref?' - CREF '+p.cref:'')+'  |  '+subtitle+'  |  gerado em '+fmtDMY(todayISO()));
+  P.rule();
+}
+/* ---- Relatório financeiro do mês (PDF) ---- */
+async function exportMonthPDF(y,m){
+  const ym=y+'-'+pad(m), P=pdfBuilder();
+  pdfHeader(P,'Relatório financeiro',MON[m-1][0].toUpperCase()+MON[m-1].slice(1)+' de '+y);
+  const rev=monthRevenue(y,m), gastos=expTotal(ym);
+  let aulas=0;
+  for(const[idd,doc]of Object.entries(S.data.attendance)){
+    if(!idd.endsWith('_'+ym)||!doc.marks)continue;
+    for(const v of Object.values(doc.marks))if(v.s==='ok')aulas++;
   }
+  const reps=gymRepasse(y,m).reduce((a,r)=>a+r.total,0);
+  P.h2('Resumo');
+  P.kv('Receita do mês',brl(rev.got));
+  P.kv('Gastos do mês',brl(gastos));
+  P.kv('Lucro',brl(rev.got-gastos));
+  P.kv('Aulas dadas',aulas+(aulas?'  ('+brl(rev.got/aulas)+' por aula)':''));
+  if(reps)P.kv('Repasse devido às academias',brl(reps));
+  const od=overdueTotal(); if(od)P.kv('Inadimplência acumulada',brl(od));
+  const C={a:46,b:110,c:330,d:470,end:549};
+  P.h2('Recebimentos');
+  P.row([{x:C.a,t:'Data'},{x:C.b,t:'Descrição'},{x:C.c,t:'Forma'},{x:C.d,t:'Valor'}],{bold:true,size:9});
+  P.rule();
+  let tot=0, any=false;
+  for(const s of students()){
+    const rec=(payDoc(s.id,y).months||{})[String(m)];
+    if(!rec)continue; any=true;
+    const v=recAmt(rec,s); tot+=v;
+    P.row([{x:C.a,t:fmtDMY(rec.at||ym+'-01')},{x:C.b,t:'Mensalidade - '+s.name,next:C.c},{x:C.c,t:rec.via||'-',next:C.d},{x:C.d,t:brl(v)}]);
+  }
+  for(const p of Object.values(S.data.packs)){
+    if((p.at||'').slice(0,7)!==ym)continue; any=true;
+    const s=stById(p.sid); tot+=Number(p.value)||0;
+    P.row([{x:C.a,t:fmtDMY(p.at)},{x:C.b,t:'Pacote '+(p.name||p.qty+' aulas')+' - '+(s?s.name:''),next:C.c},{x:C.c,t:p.via||'-',next:C.d},{x:C.d,t:brl(p.value)}]);
+  }
+  if(!any)P.row([{x:C.a,t:'Nenhum recebimento registrado neste mês.'}]);
+  P.rule();
+  P.row([{x:C.b,t:'Total recebido'},{x:C.d,t:brl(tot)}],{bold:true});
+  P.h2('Gastos');
+  P.row([{x:C.a,t:'Data'},{x:C.b,t:'Categoria'},{x:C.c,t:'Descrição'},{x:C.d,t:'Valor'}],{bold:true,size:9});
+  P.rule();
+  const exps=monthExpenses(ym);
+  if(!exps.length)P.row([{x:C.a,t:'Nenhum gasto lançado neste mês.'}]);
+  for(const e2 of exps)P.row([{x:C.a,t:fmtDMY(e2.d)},{x:C.b,t:e2.cat||'Outros',next:C.c},{x:C.c,t:e2.note||'-',next:C.d},{x:C.d,t:brl(e2.v)}]);
+  P.rule();
+  P.row([{x:C.b,t:'Total de gastos'},{x:C.d,t:brl(gastos)}],{bold:true});
+  await downloadPDF('prancheta-relatorio-'+ym+'.pdf',P.finish());
+}
+/* ---- Relatório anual (PDF) ---- */
+async function exportYearPDF(y){
+  const P=pdfBuilder();
+  pdfHeader(P,'Relatório anual','Ano de '+y);
+  const C={a:46,b:170,c:300,d:430,end:549};
+  P.h2('Resumo por mês');
+  P.row([{x:C.a,t:'Mês'},{x:C.b,t:'Receita'},{x:C.c,t:'Gastos'},{x:C.d,t:'Lucro'}],{bold:true,size:9});
+  P.rule();
+  let tr=0,tg=0;
+  for(let m=1;m<=12;m++){
+    const r=monthRevenue(y,m).got, g=expTotal(y+'-'+pad(m));
+    tr+=r; tg+=g;
+    if(r||g)P.row([{x:C.a,t:MON[m-1][0].toUpperCase()+MON[m-1].slice(1)},{x:C.b,t:brl(r)},{x:C.c,t:brl(g)},{x:C.d,t:brl(r-g)}]);
+  }
+  P.rule();
+  P.row([{x:C.a,t:'Total do ano'},{x:C.b,t:brl(tr)},{x:C.c,t:brl(tg)},{x:C.d,t:brl(tr-tg)}],{bold:true});
+  const tops=students().map(s=>{
+    let tot=0;
+    for(const r2 of Object.values(payDoc(s.id,y).months||{}))tot+=recAmt(r2,s);
+    for(const p of studentPacks(s.id))if((p.at||'').slice(0,4)===String(y))tot+=Number(p.value)||0;
+    return{s,tot};
+  }).filter(x=>x.tot>0).sort((a,b)=>b.tot-a.tot).slice(0,10);
+  if(tops.length){
+    P.h2('Maiores clientes do ano');
+    P.row([{x:C.a,t:'Aluno'},{x:C.c,t:'Total no ano'}],{bold:true,size:9});
+    P.rule();
+    tops.forEach((x,i)=>P.row([{x:C.a,t:(i+1)+'. '+x.s.name,next:C.c},{x:C.c,t:brl(x.tot)}]));
+  }
+  await downloadPDF('prancheta-relatorio-'+y+'.pdf',P.finish());
+}
+/* ---- Contatos (PDF) ---- */
+async function exportContactsPDF(){
+  const P=pdfBuilder();
+  pdfHeader(P,'Contatos dos alunos',students().length+' aluno(s)');
+  const C={a:46,b:210,c:330,d:420,e:490,end:549};
+  P.row([{x:C.a,t:'Nome'},{x:C.b,t:'Telefone'},{x:C.c,t:'Modalidade'},{x:C.d,t:'Plano'},{x:C.e,t:'Status'}],{bold:true,size:9});
+  P.rule();
+  for(const s of students().sort((a,b)=>a.name.localeCompare(b.name)))
+    P.row([{x:C.a,t:s.name,next:C.b},{x:C.b,t:s.phone||'-',next:C.c},{x:C.c,t:modeLabel(s),next:C.d},
+      {x:C.d,t:s.plan==='pacote'?'Pacote':(Number(s.fee)>0?brl(s.fee):'Mensal'),next:C.e},
+      {x:C.e,t:s.active===false?'pausado':'ativo'}],{size:9});
+  await downloadPDF('prancheta-contatos.pdf',P.finish());
+}
+/* ---- Ficha do aluno (PDF) ---- */
+async function exportFichaPDF(sid){
+  const s=stById(sid); if(!s)return;
+  const P=pdfBuilder();
+  pdfHeader(P,'Ficha do aluno',s.name);
+  P.h2('Dados');
+  P.kv('Modalidade',modeLabel(s));
+  P.kv('Cobrança',s.plan==='pacote'?'Pacote de aulas':'Mensalidade'+(Number(s.fee)>0?' de '+brl(s.fee)+' (vence dia '+(s.dueDay||5)+')':''));
+  if(s.goal)P.kv('Objetivo',s.goal);
+  if(s.phone)P.kv('Telefone',s.phone);
+  if(s.birth)P.kv('Nascimento',fmtDMY(s.birth));
+  if(s.height)P.kv('Altura',s.height+' cm');
+  if(s.start)P.kv('Início',fmtDMY(s.start));
+  if(s.emgName)P.kv('Emergência',s.emgName+(s.emgPhone?' - '+s.emgPhone:''));
+  if((s.schedule||[]).length)P.kv('Horários',s.schedule.map(x=>WDS[x.d]+' '+x.t+(x.w?' ('+x.w+')':'')).join(', '));
+  if(s.plan==='pacote'){
+    const pi=packInfo(s.id), ap=activePack(s.id);
+    P.h2('Pacote');
+    if(ap)P.kv('Pacote ativo',ap.name+((ap.extras||[]).length?'  (inclui: '+ap.extras.join(', ')+')':''));
+    P.kv('Saldo de aulas',pi.credits===0?'sem pacote lançado':String(pi.left)+' de '+pi.credits);
+  }
+  const att=attStatsAll(s.id);
+  if(att.rate!==null){P.h2('Frequência');P.kv('Taxa geral',att.rate+'%  ('+att.ok+' presenças, '+att.miss+' faltas)');P.kv('Sequência atual',streakOf(s.id)+' presença(s) seguidas')}
+  const ev=((S.data.evals[s.id]||{}).entries||[]).slice().sort((a,b)=>a.d.localeCompare(b.d));
+  if(ev.length){
+    P.h2('Últimas avaliações');
+    const C={a:46,b:130,c:220,d:310,e:400,end:549};
+    P.row([{x:C.a,t:'Data'},{x:C.b,t:'Peso'},{x:C.c,t:'% Gordura'},{x:C.d,t:'M. magra'},{x:C.e,t:'Ritmo'}],{bold:true,size:9});
+    P.rule();
+    for(const e2 of ev.slice(-8)){
+      const pc=paceOf(e2.runDist,e2.runTime);
+      P.row([{x:C.a,t:fmtDMY(e2.d)},{x:C.b,t:e2.w?e2.w+' kg':'-'},{x:C.c,t:e2.bf?e2.bf+' %':'-'},{x:C.d,t:e2.mm?e2.mm+' kg':'-'},{x:C.e,t:pc?fmtPace(pc):'-'}]);
+    }
+  }
+  if(s.notes){P.h2('Observações');P.row([{x:46,t:s.notes,next:549}])}
+  await downloadPDF('prancheta-ficha-'+firstName(s.name).toLowerCase()+'.pdf',P.finish());
 }
 /* ===== v4: consultoria, treinos, fixos, espera, ficha ===== */
 function openWorkoutTpls(){
@@ -3546,30 +3729,6 @@ function openDayNoteForm(iso){
     closeAllLayers(); renderMain(); toast('Nota salva ✓');
   });
 }
-async function exportYearCSV(y){
-  const sep=';', lines=['tipo'+sep+'data'+sep+'descricao'+sep+'categoria/forma'+sep+'valor'];
-  const csvNum=v=>String((Number(v)||0).toFixed(2)).replace('.',',');
-  const q=s2=>'"'+String(s2||'').replace(/"/g,'""')+'"';
-  for(const s of students())
-    for(const[k2,rec]of Object.entries(payDoc(s.id,y).months||{}))
-      lines.push(['receita',rec.at||y+'-'+pad(Number(k2))+'-01',q('Mensalidade '+s.name),q(rec.via||''),csvNum(recAmt(rec,s))].join(sep));
-  for(const p of Object.values(S.data.packs))
-    if((p.at||'').slice(0,4)===String(y)){const s=stById(p.sid);lines.push(['receita',p.at,q('Pacote '+p.qty+' aulas '+(s?s.name:'')),q(p.via||''),csvNum(p.value)].join(sep))}
-  for(let m=1;m<=12;m++)
-    for(const e2 of monthExpenses(y+'-'+pad(m)))
-      lines.push(['gasto',e2.d,q(e2.note||e2.cat),q(e2.cat),csvNum(-(Number(e2.v)||0))].join(sep));
-  const csv='﻿'+lines.join('\r\n');
-  let dl=null;
-  try{ if(window.claude&&window.claude.use)dl=await window.claude.use('downloads'); }catch(e){}
-  if(dl){ try{ await dl.save({filename:'prancheta-financeiro-'+y+'.csv',data:csv}); toast('CSV do ano exportado ✓'); return; }catch(e){ if(e&&(e.code==='declined'||e.code==='rate_limited'))return; } }
-  try{
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
-    a.download='prancheta-financeiro-'+y+'.csv';
-    document.body.appendChild(a); a.click(); a.remove();
-    toast('CSV do ano baixado ✓');
-  }catch(e){ try{await navigator.clipboard.writeText(csv);toast('CSV copiado ✓')}catch(e2){toast('Não foi possível exportar.','bad')} }
-}
 function openNotifPrefs(){
   const st=settings(), id=uid('nt');
   const perm=canNotify()?Notification.permission:'unsupported';
@@ -3670,7 +3829,7 @@ function vMais(){
   <div class="sec"><div class="eyebrow">Dados</div><div class="card" style="padding:4px 16px">
     <button class="cfgrow" data-a="exp"><span class="lead">${I.dl}</span><span class="grow"><div class="t">Exportar backup</div><div class="d">${nStu} aluno(s) · arquivo JSON com tudo</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
     <button class="cfgrow" data-a="imp"><span class="lead">${I.ul}</span><span class="grow"><div class="t">Importar backup</div><div class="d">Restaurar de um arquivo exportado</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
-    <button class="cfgrow" data-a="contacts-csv"><span class="lead">${I.users}</span><span class="grow"><div class="t">Exportar contatos (CSV)</div><div class="d">Nome, telefone, modalidade e mensalidade de todos os alunos</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
+    <button class="cfgrow" data-a="contacts-pdf"><span class="lead">${I.users}</span><span class="grow"><div class="t">Exportar contatos (PDF)</div><div class="d">Nome, telefone, modalidade e plano de todos os alunos</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
     <button class="cfgrow" data-a="wipe" style="color:var(--bad)"><span class="lead" style="background:var(--bad-soft);color:var(--bad)">${I.trash}</span><span class="grow"><div class="t" style="color:var(--bad)">Apagar todos os dados</div><div class="d">Remove alunos, agenda e cadastro</div></span></button>
   </div></div>
   <div class="sec"><div class="eyebrow">Diagnóstico</div><div class="card" style="padding:10px 16px">
@@ -4077,7 +4236,6 @@ const A={
   'mg-presets':()=>openPresetsManager(),
   'mg-files':()=>{closeAllLayers();openFilesManager()},
   'send-file':()=>openSendFile(),
-  'csv-export':el=>exportCSV(Number(el.dataset.y),Number(el.dataset.m)),
   'copy-pix':async()=>{
     const k=(S.data.profile||{}).pixKey||'';
     try{await navigator.clipboard.writeText(k);toast('Chave Pix copiada ✓')}catch(e){toast(k)}
@@ -4164,7 +4322,17 @@ const A={
   'diary-del':el=>{consultRemove(el.dataset.sid,'notes',Number(el.dataset.i));renderMain();toast('Anotação removida.')},
   'stu-ficha':el=>{
     const s=stById(el.dataset.sid); if(!s)return;
-    shareText(fichaText(s),'Ficha copiada ✓');
+    openLayer(`<div class="modal" role="dialog">
+      <div class="m-head"><h2>Ficha de ${esc(firstName(s.name))}</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
+      <div class="m-body"><div class="lst">
+        <button class="rowcard" data-a="stu-ficha-pdf" data-sid="${s.id}"><span class="icon-btn" style="background:var(--accent-soft);color:var(--accent)">${I.dl}</span><span class="grow"><span class="nm">Baixar em PDF</span><div class="dt">Ficha completa com avaliações e frequência</div></span></button>
+        <button class="rowcard" data-a="stu-ficha-txt" data-sid="${s.id}"><span class="icon-btn" style="background:var(--surface2)">${I.msg}</span><span class="grow"><span class="nm">Copiar/compartilhar texto</span><div class="dt">Resumo para colar no WhatsApp</div></span></button>
+      </div></div></div>`,{sheet:true});
+  },
+  'stu-ficha-pdf':el=>{closeAllLayers();exportFichaPDF(el.dataset.sid)},
+  'stu-ficha-txt':el=>{
+    const s=stById(el.dataset.sid); if(!s)return;
+    closeAllLayers(); shareText(fichaText(s),'Ficha copiada ✓');
   },
   'exp-fixed':el=>{
     const rec=settings().recurringExp||[];
@@ -4193,24 +4361,9 @@ const A={
       closeAllLayers(); renderMain(); toast('Meta salva ✓');
     });
   },
-  'csv-year':el=>exportYearCSV(Number(el.dataset.y)),
-  'contacts-csv':async()=>{
-    const sep=';', q=s2=>'"'+String(s2||'').replace(/"/g,'""')+'"';
-    const lines=['nome'+sep+'telefone'+sep+'modalidade'+sep+'plano'+sep+'mensalidade'+sep+'status'];
-    for(const s of students().sort((a,b)=>a.name.localeCompare(b.name)))
-      lines.push([q(s.name),q(s.phone),q(modeLabel(s)),q(s.plan==='pacote'?'Pacote':'Mensal'),String(Number(s.fee)||0).replace('.',','),s.active===false?'pausado':'ativo'].join(sep));
-    const csv='﻿'+lines.join('\r\n');
-    let dl=null;
-    try{ if(window.claude&&window.claude.use)dl=await window.claude.use('downloads'); }catch(e){}
-    if(dl){ try{ await dl.save({filename:'prancheta-contatos.csv',data:csv}); toast('Contatos exportados ✓'); return; }catch(e){ if(e&&(e.code==='declined'||e.code==='rate_limited'))return; } }
-    try{
-      const a=document.createElement('a');
-      a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
-      a.download='prancheta-contatos.csv';
-      document.body.appendChild(a); a.click(); a.remove();
-      toast('Contatos baixados ✓');
-    }catch(e){ try{await navigator.clipboard.writeText(csv);toast('Contatos copiados ✓')}catch(e2){toast('Não foi possível exportar.','bad')} }
-  },
+  'pdf-month':el=>exportMonthPDF(Number(el.dataset.y),Number(el.dataset.m)),
+  'pdf-year':el=>exportYearPDF(Number(el.dataset.y)),
+  'contacts-pdf':()=>exportContactsPDF(),
   'wa-saldo':el=>{
     const s=stById(el.dataset.sid); if(!s)return;
     const pi=packInfo(s.id);
