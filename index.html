@@ -437,8 +437,6 @@ button.tile:active{transform:scale(.985)}
 .cfgrow .lead{width:36px;height:36px;border-radius:10px;background:var(--surface2);display:grid;place-items:center;color:var(--ink2);flex:none}
 .cfgrow .lead svg{width:18px;height:18px}
 </style>
-</head>
-<body>
 
 <div id="splash"><div class="in"><div class="mk">P</div><div class="t">PRANCHETA</div><div class="s">Carregando sua agenda…</div></div></div>
 
@@ -521,11 +519,11 @@ const I={
 };
 
 /* ================= state ================= */
-const KEY='prancheta-v1', TKEY='prancheta-unlock', KKEY='prancheta-keep';
-const COLLS=['students','attendance','payments','exceptions','evals','packs','expenses','reminders','consult','daynotes'];
+const KEY='prancheta-v1', TKEY='prancheta-unlock', KKEY='prancheta-keep', VERSION='v6';
+const COLLS=['students','attendance','payments','exceptions','evals','packs','expenses','reminders','consult','daynotes','loads'];
 const S={
   mode:'loading', db:null, cloud:false, booted:false,
-  data:{profile:null,settings:null,students:{},attendance:{},payments:{},exceptions:{},evals:{},packs:{},expenses:{},reminders:{},consult:{},daynotes:{}},
+  data:{profile:null,settings:null,students:{},attendance:{},payments:{},exceptions:{},evals:{},packs:{},expenses:{},reminders:{},consult:{},daynotes:{},loads:{}},
   ui:{view:'hoje', selDate:todayISO(), sid:null, q:'', filter:'ativos',
       finY:new Date().getFullYear(), finM:new Date().getMonth()+1, finTab:'receber'},
   ob:null, draft:null,
@@ -540,6 +538,7 @@ const defTemplates=()=>({
   checkin:'Oi, {primeiro}! 👊 Dia de check-in: como foi a semana de treinos? Me conta o que foi bem e onde travou — ajusto o que precisar.',
   boasvindas:'Bem-vindo(a) ao time, {primeiro}! 🎉 Estou muito feliz de começar essa jornada com você. Qualquer dúvida, me chama por aqui!',
   treino:'Olá, {primeiro}! 💪 Segue seu novo treino:\n\n{treino}\n\nValidade: {semanas} semana(s). Bons treinos!',
+  cargas:'Olá, {primeiro}! 📈 Olha só a sua evolução de carga:\n\n{cargas}\n\nOrgulho do seu progresso — bora manter o ritmo! 💪',
 });
 const defSettings=()=>({
   days:{0:defDay(false,'07:00','12:00'),1:defDay(true,'06:00','21:00'),2:defDay(true,'06:00','21:00'),
@@ -550,7 +549,7 @@ const defSettings=()=>({
   expCats:['Deslocamento','Combustível','Alimentação','Repasse','Equipamento','Outros'],
   gyms:[], remindMin:30, packWarn:3, lastMethod:'',
   templates:defTemplates(),
-  plans:[], promos:[], packPresets:[], files:[],
+  promos:[], packPresets:[], files:[],
   theme:0, autoLock:0,
   signature:'Do seu Personal {personal}',
   goalRevenue:0, weekStart:1, startTab:'hoje',
@@ -775,7 +774,7 @@ function renderChrome(){
   $('#tabbar').innerHTML=NAV.map(([v,l,ic])=>`<button data-a="nav" data-v="${v}" class="${navOn(v)?'on':''}" aria-label="${l}">${ic}<span>${l}</span></button>`).join('');
   $('#sidebar').innerHTML=`<div class="logo"><span class="mk">P</span>PRANCHETA</div>`+
     NAV.map(([v,l,ic])=>`<button class="nv ${navOn(v)?'on':''}" data-a="nav" data-v="${v}">${ic}<span>${l}</span></button>`).join('')+
-    `<div class="sb-foot">${S.syncDead?'⚠ Sincronização interrompida':S.cloud?'☁ Sincronizado':'⬇ Somente neste aparelho'}<br><span class="small muted">Prancheta · v1</span></div>`;
+    `<div class="sb-foot">${S.syncDead?'⚠ Sincronização interrompida':S.cloud?'☁ Sincronizado':'⬇ Somente neste aparelho'}<br><span class="small muted">Prancheta · ${VERSION}</span></div>`;
 }
 function navOn(v){ return S.ui.view===v||(v==='alunos'&&S.ui.view==='aluno'); }
 
@@ -1371,6 +1370,8 @@ const fraseDoDia=()=>{const d=new Date();const doy=Math.floor((d-new Date(d.getF
 function imcOf(w,hcm){ const h=Number(hcm)/100; return w&&h?w/(h*h):null; }
 function imcClass(v){ return v==null?'':v<18.5?'abaixo do peso':v<25?'peso normal':v<30?'sobrepeso':v<35?'obesidade I':v<40?'obesidade II':'obesidade III'; }
 function paceOf(dist,timeMin){ const d=Number(dist),t=Number(timeMin); return d>0&&t>0?t/d:null; }
+const n1=v=>Number(v).toLocaleString('pt-BR',{maximumFractionDigits:1});
+const n2=v=>Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 function fmtPace(p){ if(p==null)return'—'; const m=Math.floor(p),s=Math.round((p-m)*60); return m+':'+pad(s)+'/km'; }
 const EVAL_METRICS=[
   ['w','Peso','kg',1],['mm','M. magra','kg',1],['mg','M. gorda','kg',1],['bf','Gordura','%',1],
@@ -1596,6 +1597,7 @@ function vHoje(){
   let topStreak=null;
   for(const s of activeStudents()){const n=streakOf(s.id);if(n>=3&&(!topStreak||n>topStreak.n))topStreak={s,n}}
   const waitN=(settings().waitlist||[]).length;
+  const prs=recentPRs(7).slice(0,3);
   const goal=Number(settings().goalRevenue)||0;
   const goalPct=goal?Math.min(100,Math.round(rev.got/goal*100)):0;
   const noteToday=dayNote(iso);
@@ -1669,7 +1671,8 @@ function vHoje(){
       ${tmList.slice(0,3).map(it=>{const s2=stById(it.sid);return`<div class="row" style="padding:5px 0"><span class="mono" style="font-weight:800;width:46px">${it.time}</span><span class="grow" style="font-weight:600;font-size:13.5px">${esc(s2?s2.name:'')}</span>${it.w?`<span class="small muted">${esc(it.w)}</span>`:''}</div>`}).join('')}
       ${tmList.length>3?`<div class="small muted" style="padding:5px 0">+ ${tmList.length-3} sessão(ões) — toque para ver o dia</div>`:''}
     </button></div>`:''}
-  ${(topStreak||waitN)?`<div class="sec"><div class="eyebrow">Destaques</div><div class="card" style="padding:6px 14px">
+  ${(topStreak||waitN||prs.length)?`<div class="sec"><div class="eyebrow">Destaques</div><div class="card" style="padding:6px 14px">
+    ${prs.map(pr=>`<button class="row" style="padding:8px 0;width:100%;text-align:left;cursor:pointer" data-a="stu" data-sid="${pr.s.id}"><span style="flex:none">🏆</span><span class="grow" style="font-size:13.5px;font-weight:600"><b>${esc(pr.s.name)}</b> bateu recorde em ${esc(pr.ex.name)}: <b>${kgFmt(pr.e.kg)} kg</b> <span class="muted">(antes ${kgFmt(pr.prev)} kg · ${fmtDM(pr.e.d)})</span></span>${I.chr.replace('<svg','<svg width="14" height="14" style="color:var(--ink2)"')}</button>`).join('')}
     ${topStreak?`<button class="row" style="padding:8px 0;width:100%;text-align:left;cursor:pointer" data-a="stu" data-sid="${topStreak.s.id}"><span style="flex:none">🔥</span><span class="grow" style="font-size:13.5px;font-weight:600"><b>${esc(topStreak.s.name)}</b> está com ${topStreak.n} presenças seguidas</span>${I.chr.replace('<svg','<svg width="14" height="14" style="color:var(--ink2)"')}</button>`:''}
     ${waitN?`<button class="row" style="padding:8px 0;width:100%;text-align:left;cursor:pointer" data-a="waitlist"><span style="flex:none">👥</span><span class="grow" style="font-size:13.5px;font-weight:600">${waitN} pessoa(s) na lista de espera</span>${I.chr.replace('<svg','<svg width="14" height="14" style="color:var(--ink2)"')}</button>`:''}
   </div></div>`:''}
@@ -2136,6 +2139,7 @@ function vAluno(){
     }).join('')}</div>
     <p class="hint" style="margin-top:9px;color:var(--ink2);font-size:11.5px">Toque em um mês para marcar ou desfazer o pagamento.</p></div></div>`:''}
   ${evalSectionHTML(s,entries)}
+  ${loadSectionHTML(s,wa)}
   ${docsSectionHTML(s)}
   ${diarySectionHTML(s)}
   <div class="sec"><div class="eyebrow">Observações</div>
@@ -2152,6 +2156,7 @@ function msgCenterHTML(s){
   if(s.plan==='pacote')items.push(btn('wa-saldo','Saldo de aulas',I.box));
   if(isConsult(s))items.push(btn('wa-checkin','Check-in',I.bell));
   items.push(btn('wa-treino','Enviar treino',I.chart));
+  if((loadsDoc(s.id).exercises||[]).some(ex=>(ex.entries||[]).length))items.push(btn('wa-cargas','Evolução de carga',I.chart));
   items.push(btn('send-plans','Pacotes e promoções',I.cash));
   items.push(btn('wa-boasvindas','Boas-vindas',I.sun));
   if(s.birth){
@@ -2264,11 +2269,11 @@ function evalSectionHTML(s,entries){
     const w0=evalVal(firstE,'w'),w1=evalVal(last,'w');
     if(w0&&w1&&w0!==goal)goalPct=Math.max(0,Math.min(100,Math.round((w0-w1)/(w0-goal)*100)));
   }
-  const cmp=[];
+  const cmp=[], wantUp=s.goal==='Hipertrofia'||s.goal==='Performance';
   if(firstE&&last&&firstE!==last){
     for(const[k,l,u]of EVAL_METRICS){
       const a=evalVal(firstE,k),b=evalVal(last,k);
-      if(a!=null&&b!=null)cmp.push({l,u,a,b,d:b-a,inv:k==='pace'});
+      if(a!=null&&b!=null)cmp.push({l,u,a,b,d:b-a,good:k==='pace'?b<a:k==='mm'?b>a:k==='w'?(wantUp?b>a:b<a):b<a});
     }
   }
   const fmtV=(v,u)=>u==='min/km'?fmtPace(v):v.toLocaleString('pt-BR',{maximumFractionDigits:1})+' '+u;
@@ -2279,12 +2284,12 @@ function evalSectionHTML(s,entries){
     <div class="card">
       ${last?`<div class="kv" style="margin-bottom:14px">
         ${evalVal(last,'w')!=null?`<div class="it"><div class="k">Peso</div><div class="v mono">${fmtV(evalVal(last,'w'),'kg')}</div></div>`:''}
-        ${imc!=null?`<div class="it"><div class="k">IMC</div><div class="v mono">${imc.toFixed(1)}</div><div class="small muted">${imcClass(imc)}</div></div>`:''}
+        ${imc!=null?`<div class="it"><div class="k">IMC</div><div class="v mono">${n1(imc)}</div><div class="small muted">${imcClass(imc)}</div></div>`:''}
         ${evalVal(last,'mm')!=null?`<div class="it"><div class="k">Massa magra</div><div class="v mono">${fmtV(evalVal(last,'mm'),'kg')}</div></div>`:''}
         ${evalVal(last,'mg')!=null?`<div class="it"><div class="k">Massa gorda</div><div class="v mono">${fmtV(evalVal(last,'mg'),'kg')}</div></div>`:''}
         ${evalVal(last,'bf')!=null?`<div class="it"><div class="k">% Gordura</div><div class="v mono">${fmtV(evalVal(last,'bf'),'%')}</div></div>`:''}
-        ${rcq!=null?`<div class="it"><div class="k">RCQ</div><div class="v mono">${rcq.toFixed(2)}</div><div class="small muted">cintura ÷ quadril</div></div>`:''}
-        ${pace!=null?`<div class="it"><div class="k">Ritmo de corrida</div><div class="v mono">${fmtPace(pace)}</div><div class="small muted">${Number(last.runDist).toLocaleString('pt-BR')} km em ${last.runTime} min</div></div>`:''}
+        ${rcq!=null?`<div class="it"><div class="k">RCQ</div><div class="v mono">${n2(rcq)}</div><div class="small muted">cintura ÷ quadril</div></div>`:''}
+        ${pace!=null?`<div class="it"><div class="k">Ritmo de corrida</div><div class="v mono">${fmtPace(pace)}</div><div class="small muted">${n1(last.runDist)} km em ${n1(last.runTime)} min</div></div>`:''}
       </div>`:''}
       ${goalPct!==null?`<div style="margin-bottom:14px"><div class="row between small" style="margin-bottom:5px"><b>Meta: ${goal.toLocaleString('pt-BR')} kg</b><span class="muted mono">${goalPct}%</span></div><div class="bar"><i class="acc" style="width:${goalPct}%"></i></div></div>`:''}
       ${avail.length&&series.length>=2?`<div class="seg" style="margin-bottom:10px;flex-wrap:wrap">${avail.map(([k,l])=>`<button class="${met===k?'on':''}" data-a="eval-metric" data-m="${k}">${l}</button>`).join('')}</div>
@@ -2292,7 +2297,7 @@ function evalSectionHTML(s,entries){
       ${cmp.length?`<div style="margin-top:14px"><div class="eyebrow" style="margin-bottom:7px">Primeira × última avaliação</div>
         ${cmp.map(c=>`<div class="row small" style="padding:4px 0"><span style="width:92px;color:var(--ink2);font-weight:600">${c.l}</span>
           <span class="mono">${fmtV(c.a,c.u)} → <b>${fmtV(c.b,c.u)}</b></span>
-          <span class="pill ${(c.inv?c.d<0:c.l==='M. magra'?c.d>0:c.d<0)?'ok':c.d===0?'mut':'warn'}" style="font-size:10px">${c.d>0?'+':''}${c.u==='min/km'?(c.d*60).toFixed(0)+'s/km':c.d.toLocaleString('pt-BR',{maximumFractionDigits:1})}</span>
+          <span class="pill ${c.d===0?'mut':c.good?'ok':'warn'}" style="font-size:10px">${c.d>0?'+':''}${c.u==='min/km'?(c.d*60).toFixed(0)+'s/km':c.d.toLocaleString('pt-BR',{maximumFractionDigits:1})}</span>
         </div>`).join('')}</div>`:''}
       ${entries.length?`<div style="margin-top:12px">${entries.slice(-6).reverse().map(e2=>{
         const idx=entries.indexOf(e2);
@@ -2320,18 +2325,6 @@ function metricChart(series,mdef){
     <polygon class="ar" points="${xy[0][0]},${H} ${line} ${last[0]},${H}"/>
     <polyline points="${line}"/><circle cx="${last[0]}" cy="${last[1]}" r="3.5"/></svg>
   <div class="row between small muted mono"><span>${fmtDM(pts[0].d)}</span><span>${fmt(min)}–${fmt(max)} ${mdef[2]==='min/km'?'':mdef[2]}</span><span>${fmtDM(pts[pts.length-1].d)}</span></div>`;
-}
-function evalChart(entries){
-  const pts=entries.slice(-12);
-  const ws=pts.map(p=>p.w), min=Math.min(...ws), max=Math.max(...ws);
-  const pad2=(max-min)||1, W=560, H=64;
-  const xy=pts.map((p,i)=>[pts.length===1?W/2:8+i*(W-16)/(pts.length-1),H-8-((p.w-min)/pad2)*(H-16)]);
-  const line=xy.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
-  const last=xy[xy.length-1];
-  return`<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Evolução de peso">
-    <polygon class="ar" points="${xy[0][0]},${H} ${line.split(' ').join(' ')} ${last[0]},${H}"/>
-    <polyline points="${line}"/><circle cx="${last[0]}" cy="${last[1]}" r="3.5"/></svg>
-  <div class="row between small muted mono"><span>${fmtDM(pts[0].d)}</span><span>${min.toLocaleString('pt-BR')}–${max.toLocaleString('pt-BR')} kg</span><span>${fmtDM(pts[pts.length-1].d)}</span></div>`;
 }
 /* ================= student form ================= */
 function openStudentForm(sid){
@@ -2606,7 +2599,7 @@ function saveStudent(){
 function deleteStudent(sid){
   const s=stById(sid); if(!s)return;
   confirmDlg({title:'Excluir aluno',danger:true,okLabel:'Excluir tudo',typed:'EXCLUIR',
-    msg:`Excluir <b>${esc(s.name)}</b> apaga o cadastro, os horários, o histórico de presenças, pagamentos e avaliações. Essa ação não pode ser desfeita.`,
+    msg:`Excluir <b>${esc(s.name)}</b> apaga o cadastro, os horários, o histórico de presenças, pagamentos, avaliações, cargas e diário. Essa ação não pode ser desfeita.`,
     onOk:()=>{
       delDoc('students',sid);
       for(const id of Object.keys(S.data.attendance))if(id.startsWith(sid+'_'))delDoc('attendance',id);
@@ -2614,6 +2607,7 @@ function deleteStudent(sid){
       for(const id of Object.keys(S.data.packs))if((S.data.packs[id]||{}).sid===sid)delDoc('packs',id);
       if(S.data.evals[sid])delDoc('evals',sid);
       if(S.data.consult[sid])delDoc('consult',sid);
+      if(S.data.loads[sid])delDoc('loads',sid);
       for(const[docId,doc]of Object.entries(S.data.exceptions)){
         const items={...(doc.items||{})}; let ch=false;
         for(const[k,v]of Object.entries(items))if(v.sid===sid){delete items[k];ch=true}
@@ -3097,6 +3091,7 @@ function openTplEditor(){
     ['checkin','Chamada de check-in (consultoria)','{nome} {primeiro} {artigo} {personal}'],
     ['boasvindas','Boas-vindas ao aluno novo','{nome} {primeiro} {artigo} {personal}'],
     ['treino','Envio de treino (consultoria)','{nome} {primeiro} {treino} {semanas} {personal}'],
+    ['cargas','Evolução de carga (exercícios)','{nome} {primeiro} {artigo} {cargas} {personal}'],
   ];
   openLayer(`<div class="modal wide" role="dialog">
     <div class="m-head"><h2>Mensagens do WhatsApp</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
@@ -3290,15 +3285,23 @@ function openSendFile(){
 }
 /* ===== gerador de PDF (JS puro, sem bibliotecas) =====
    Saída 100% ASCII: acentos viram escapes octais WinAnsi, então o arquivo
-   sobrevive intacto tanto ao Blob quanto à capability downloads. */
-function pdfEscape(s){
-  s=String(s??'')
+   sobrevive intacto tanto ao Blob quanto à capability downloads.
+   Tem medição de texto (tabela de larguras da Helvetica) para alinhar à
+   direita, centralizar, truncar com reticências e quebrar parágrafos, e
+   primitivas gráficas (retângulos, linhas, círculos, polilinhas) para os
+   gráficos de barras e de linha dos relatórios. */
+const PDF_W_R=[278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584];
+const PDF_W_B=[278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584];
+function pdfPlain(s){
+  return String(s??'')
     .replace(/[✓✔]/g,'OK').replace(/[✗✘]/g,'X')
     .replace(/[“”]/g,'"').replace(/[‘’]/g,"'")
-    .replace(/—|–/g,'-').replace(/·|•/g,'-').replace(/…/g,'...')
+    .replace(/—|–/g,'-').replace(/·|•/g,'-').replace(/…/g,'...').replace(/×/g,'x').replace(/≈/g,'~').replace(/→/g,'->')
     .replace(/[\u{1F300}-\u{1FAFF}☀-➿️]/gu,'');
+}
+function pdfEscape(s){
   let out='';
-  for(const ch of s){
+  for(const ch of pdfPlain(s)){
     const c=ch.charCodeAt(0);
     if(ch==='\\'||ch==='('||ch===')')out+='\\'+ch;
     else if(c>=32&&c<127)out+=ch;
@@ -3307,36 +3310,241 @@ function pdfEscape(s){
   }
   return out;
 }
-function pdfBuilder(){
-  const PW=595, PH=842, M=46;
-  const pages=[]; let ops=null, y=0;
-  const np=()=>{ops=[];pages.push(ops);y=PH-M;};
-  np();
-  const ensure=need=>{if(y-need<M+14)np()};
-  const put=(x,str,size,bold)=>{ops.push('BT /F'+(bold?'B':'R')+' '+size+' Tf '+x.toFixed(1)+' '+y.toFixed(1)+' Td ('+pdfEscape(str)+') Tj ET')};
-  const clip=(str,x,xNext,size)=>{const max=Math.max(3,Math.floor((xNext-x-6)/(size*0.52)));str=String(str??'');return str.length>max?str.slice(0,max-1)+'.':str};
-  return{
-    h1(t){ensure(34);put(M,t,17,true);y-=22},
-    sub(t){ensure(16);put(M,t,9.5,false);y-=13},
-    h2(t){ensure(30);y-=8;put(M,t,12,true);y-=15},
-    gap(n){y-=n},
-    rule(){ensure(10);ops.push('0.72 0.75 0.80 RG 0.7 w '+M+' '+(y+3.5).toFixed(1)+' m '+(PW-M)+' '+(y+3.5).toFixed(1)+' l S');y-=9},
-    /* cols: [{x, t, next?}] — next = x da próxima coluna, para truncar */
-    row(cols,opt){
-      const size=(opt&&opt.size)||9.5;
-      ensure(15);
-      for(const c of cols)put(c.x,c.next?clip(c.t,c.x,c.next,size):String(c.t??''),size,!!(opt&&opt.bold));
-      y-=13;
+function pdfTW(str,size,bold){
+  const T=bold?PDF_W_B:PDF_W_R; let w=0;
+  for(const ch of pdfPlain(str)){
+    const c=ch.charCodeAt(0);
+    if(c>=32&&c<127)w+=T[c-32];
+    else{const b=ch.normalize('NFD').charCodeAt(0);w+=(b>=32&&b<127)?T[b-32]:556}
+  }
+  return w*size/1000;
+}
+function pdfBuilder(meta){
+  meta=meta||{};
+  const PW=595, PH=842, M=40, CW=PW-2*M, FOOT=34;
+  const C={ink:[0.07,0.09,0.13],ink2:[0.36,0.41,0.47],line:[0.86,0.88,0.91],zebra:[0.955,0.965,0.975],
+    acc:[0.14,0.28,0.88],accSoft:[0.894,0.914,0.988],ok:[0.04,0.56,0.37],okSoft:[0.86,0.95,0.91],
+    bad:[0.82,0.23,0.18],badSoft:[0.98,0.89,0.88],warn:[0.73,0.43,0],warnSoft:[0.97,0.93,0.85],
+    ch2:[0.85,0.47,0.02],white:[1,1,1]};
+  const pages=[]; let ops=null, y=0, pageNo=0;
+  const rgb=c=>c.map(v=>(+v).toFixed(3)).join(' ');
+  const n=v=>(+v).toFixed(2);
+  const raw=s=>ops.push(s);
+  const fillRect=(x,yy,w,h,c)=>raw(rgb(c)+' rg '+n(x)+' '+n(yy)+' '+n(w)+' '+n(h)+' re f');
+  const line=(x1,y1,x2,y2,c,w)=>raw(rgb(c)+' RG '+n(w||0.7)+' w '+n(x1)+' '+n(y1)+' m '+n(x2)+' '+n(y2)+' l S');
+  const text=(x,yy,str,size,bold,c,align)=>{
+    str=String(str??''); let xx=x;
+    if(align==='r')xx=x-pdfTW(str,size,bold); else if(align==='c')xx=x-pdfTW(str,size,bold)/2;
+    raw(rgb(c||C.ink)+' rg BT /F'+(bold?'B':'R')+' '+n(size)+' Tf '+n(xx)+' '+n(yy)+' Td ('+pdfEscape(str)+') Tj ET');
+  };
+  const circle=(cx,cy,r,c)=>{const k=0.5523*r;
+    raw(rgb(c)+' rg '+n(cx+r)+' '+n(cy)+' m '
+      +n(cx+r)+' '+n(cy+k)+' '+n(cx+k)+' '+n(cy+r)+' '+n(cx)+' '+n(cy+r)+' c '
+      +n(cx-k)+' '+n(cy+r)+' '+n(cx-r)+' '+n(cy+k)+' '+n(cx-r)+' '+n(cy)+' c '
+      +n(cx-r)+' '+n(cy-k)+' '+n(cx-k)+' '+n(cy-r)+' '+n(cx)+' '+n(cy-r)+' c '
+      +n(cx+k)+' '+n(cy-r)+' '+n(cx+r)+' '+n(cy-k)+' '+n(cx+r)+' '+n(cy)+' c f')};
+  const poly=(pts,c,w)=>{if(pts.length<2)return;raw(rgb(c)+' RG '+n(w||1.6)+' w 1 J 1 j '+pts.map((p,i)=>n(p[0])+' '+n(p[1])+(i?' l':' m')).join(' ')+' S')};
+  const ellip=(str,maxW,size,bold)=>{str=String(str??'');if(pdfTW(str,size,bold)<=maxW)return str;let s=str;while(s.length>1&&pdfTW(s+'...',size,bold)>maxW)s=s.slice(0,-1);return s+'...'};
+  const wrap=(str,maxW,size,bold)=>{const out=[];
+    for(const para of String(str??'').split(/\r?\n/)){
+      const words=para.split(/\s+/).filter(Boolean); let cur='';
+      for(const w of words){const t=cur?cur+' '+w:w;
+        if(pdfTW(t,size,bold)<=maxW)cur=t; else{if(cur)out.push(cur);cur=pdfTW(w,size,bold)<=maxW?w:ellip(w,maxW,size,bold)}}
+      out.push(cur);
+    }
+    return out;
+  };
+  const newPage=()=>{
+    ops=[]; pages.push(ops); pageNo++; y=PH-M;
+    if(pageNo>1){ text(M,PH-M+6,meta.title||'Prancheta',8.5,true,C.ink2); text(PW-M,PH-M+6,meta.subtitle||'',8.5,false,C.ink2,'r'); line(M,PH-M-2,PW-M,PH-M-2,C.line,0.6); y=PH-M-14; }
+  };
+  const ensure=need=>{if(y-need<M+FOOT)newPage()};
+  newPage();
+  const tone2=t=>t==='ok'?[C.okSoft,C.ok]:t==='bad'?[C.badSoft,C.bad]:t==='warn'?[C.warnSoft,C.warn]:t==='acc'?[C.accSoft,C.acc]:[C.zebra,C.ink];
+  const B={
+    C, M, CW, PW,
+    get y(){return y}, set y(v){y=v},
+    ensure, text, fillRect, line, circle, poly, wrap, ellip, tw:pdfTW, newPage,
+    /* faixa de título da primeira página */
+    band(title,sub,sub2){
+      const h=sub2?76:62;
+      fillRect(M,y-h,CW,h,C.acc);
+      fillRect(M,y-h,5,h,C.ch2);
+      let ts=19; while(ts>12&&pdfTW(title,ts,true)>CW-34)ts-=1;
+      text(M+18,y-27,title,ts,true,C.white);
+      if(sub)text(M+18,y-44,ellip(sub,CW-36,10,false),10,false,C.white);
+      if(sub2)text(M+18,y-59,ellip(sub2,CW-36,9,false),9,false,C.white);
+      y-=h+16;
     },
-    kv(label,value){this.row([{x:M,t:label},{x:M+200,t:value}],{})},
+    h2(t,sub,keep){ensure(keep||150);y-=6;fillRect(M,y-13.5,3.5,15,C.acc);text(M+10,y-10.5,t,12.5,true,C.ink);if(sub)text(PW-M,y-10,sub,8.5,false,C.ink2,'r');y-=24},
+    h3(t){ensure(96);text(M,y-10,t,10,true,C.ink);y-=17},
+    p(str,opt){opt=opt||{};const size=opt.size||9.5,c=opt.color||C.ink,ind=opt.indent||0;
+      const lines=wrap(str,CW-ind,size,!!opt.bold);
+      for(const l of lines){ensure(size+4);text(M+ind,y-size,l,size,!!opt.bold,c);y-=size+3.5}
+      y-=3},
+    gap(v){y-=v},
+    note(msg){ensure(18);text(M,y-10,msg,8.5,false,C.ink2);y-=18},
+    /* tiles: [{l,v,d,tone}] */
+    tiles(items,perRow){
+      perRow=perRow||Math.min(4,items.length); const gapX=8,w=(CW-gapX*(perRow-1))/perRow,h=52;
+      for(let i=0;i<items.length;i+=perRow){
+        ensure(h+8);
+        items.slice(i,i+perRow).forEach((it,j)=>{
+          const x=M+j*(w+gapX), [bg,fg]=tone2(it.tone);
+          fillRect(x,y-h,w,h,bg);
+          text(x+9,y-13,String(it.l).toUpperCase(),6.8,true,C.ink2);
+          const vs=String(it.v); let vsz=15; while(vsz>8.5&&pdfTW(vs,vsz,true)>w-18)vsz-=0.5;
+          text(x+9,y-32,vs,vsz,true,fg);
+          if(it.d)text(x+9,y-44.5,ellip(it.d,w-18,7.3,false),7.3,false,C.ink2);
+        });
+        y-=h+8;
+      }
+    },
+    /* pares rótulo/valor em N colunas: [[label,value],...] */
+    kv(pairs,cols,lw){
+      cols=cols||2; lw=lw||92; const w=CW/cols, size=9;
+      for(let i=0;i<pairs.length;i+=cols){
+        const r=pairs.slice(i,i+cols);
+        const wrapped=r.map(([l,v])=>wrap(v==null||v===''?'—':v,w-lw-10,size,false));
+        const lines=Math.max(1,...wrapped.map(x=>x.length)), h=lines*11.5+7;
+        ensure(h);
+        r.forEach(([l,v],j)=>{const x=M+j*w;text(x,y-11,l,7.8,true,C.ink2);wrapped[j].forEach((ln,k)=>text(x+lw,y-11-k*11.5,ln,size,false,C.ink))});
+        line(M,y-h+2.5,PW-M,y-h+2.5,C.line,0.4);
+        y-=h;
+      }
+      y-=5;
+    },
+    /* tabela: cols [{l,w,al,bold}], rows [[cell|{t,color,bold}]], opt {size,rh,zebra,total,emptyMsg} */
+    table(cols,rows,opt){
+      opt=opt||{}; const size=opt.size||8.6, rh=opt.rh||15.5;
+      const totalW=cols.reduce((a,c)=>a+c.w,0), sc=CW/totalW;
+      const xs=[]; let x=M; for(const c of cols){xs.push(x);x+=c.w*sc}
+      const cw=i=>cols[i].w*sc;
+      const cellX=(i,al)=>al==='r'?xs[i]+cw(i)-5:al==='c'?xs[i]+cw(i)/2:xs[i]+5;
+      const head=()=>{fillRect(M,y-rh,CW,rh,C.accSoft);cols.forEach((c,i)=>text(cellX(i,c.al),y-rh+4.8,c.l,7.6,true,C.acc,c.al));y-=rh};
+      ensure(rh*2+6); head();
+      if(!rows.length){text(M+5,y-rh+4.8,opt.emptyMsg||'Nenhum registro.',size,false,C.ink2);y-=rh}
+      rows.forEach((r,ri)=>{
+        if(y-rh<M+FOOT){newPage();head()}
+        if(opt.zebra!==false&&ri%2===1)fillRect(M,y-rh,CW,rh,C.zebra);
+        r.forEach((cell,i)=>{if(i>=cols.length)return;const o=cell&&typeof cell==='object'?cell:{t:cell};const c=cols[i];
+          text(cellX(i,c.al),y-rh+4.8,ellip(o.t==null?'—':o.t,cw(i)-10,size,!!(o.bold||c.bold)),size,!!(o.bold||c.bold),o.color||C.ink,c.al)});
+        line(M,y-rh,PW-M,y-rh,C.line,0.35);
+        y-=rh;
+      });
+      if(opt.total){
+        if(y-rh<M+FOOT){newPage();head()}
+        fillRect(M,y-rh,CW,rh,C.zebra); line(M,y,PW-M,y,C.ink2,0.6);
+        opt.total.forEach((cell,i)=>{if(cell==null||cell===''||i>=cols.length)return;const o=cell&&typeof cell==='object'?cell:{t:cell};
+          text(cellX(i,cols[i].al),y-rh+4.8,ellip(o.t,cw(i)-10,size,true),size,true,o.color||C.ink,cols[i].al)});
+        y-=rh;
+      }
+      y-=8;
+    },
+    /* barras agrupadas: {labels, series:[{name,values,color}], fmt, h} */
+    bars(cfg){
+      const h=cfg.h||132, x0=M, w=CW; ensure(h+30);
+      const top=y-16, bottom=y-h+16, PL=x0+46, PR=x0+w-8;
+      const max=Math.max(1,...cfg.series.flatMap(s=>s.values.map(v=>Number(v)||0)));
+      const p10=Math.pow(10,Math.floor(Math.log10(max))), m1=max/p10;
+      const stepN=(m1<=1?0.25:m1<=2?0.5:m1<=2.5?0.5:m1<=5?1:2)*p10;
+      const mx=Math.max(stepN*4,stepN*Math.ceil(max/stepN));
+      const yOf=v=>bottom+(top-bottom)*(v/mx);
+      const fmtS=cfg.fmt||(v=>v>=1000?(v/1000).toLocaleString('pt-BR',{maximumFractionDigits:1})+'k':String(Math.round(v)));
+      let lx=PL; cfg.series.forEach(s=>{fillRect(lx,y-9,7,7,s.color);text(lx+10,y-8.5,s.name,7.5,false,C.ink2);lx+=10+pdfTW(s.name,7.5,false)+14});
+      const steps=Math.round(mx/stepN);
+      for(let i=0;i<=steps;i++){const v=stepN*i;const yy=yOf(v);line(PL,yy,PR,yy,C.line,i?0.4:0.8);text(PL-5,yy-2.5,fmtS(v),6.6,false,C.ink2,'r')}
+      const n2=cfg.labels.length, gw=(PR-PL)/n2, ns=cfg.series.length, bw=Math.min(24,(gw-12)/ns);
+      cfg.labels.forEach((lb,i)=>{
+        const cx=PL+gw*i+gw/2, start=cx-(bw*ns+2*(ns-1))/2;
+        cfg.series.forEach((s,k)=>{const v=Number(s.values[i])||0;const hh=Math.max(v>0?1.5:0,yOf(v)-bottom);const bx=start+k*(bw+2);
+          if(hh)fillRect(bx,bottom,bw,hh,s.color);
+          if(cfg.valueLabels!==false&&v>0&&n2<=8)text(bx+bw/2,bottom+hh+2.5,fmtS(v),6.2,true,C.ink2,'c')});
+        text(cx,bottom-10,lb,7.3,true,C.ink2,'c');
+      });
+      y-=h+22;
+    },
+    /* barras horizontais em posição explícita; devolve o y final */
+    hbars(pairs,opt){
+      opt=opt||{}; const x0=opt.x||M, w=opt.w||CW, color=opt.color||C.acc, fmt=opt.fmt||brl;
+      const lw=Math.min(118,Math.round(w*0.36)), vw=opt.vw||64, rh=13.5, max=Math.max(1,...pairs.map(p=>p[1]));
+      let yy=opt.y!=null?opt.y:y;
+      if(opt.title){text(x0,yy-9.5,opt.title,8.8,true,C.ink);yy-=17}
+      pairs.forEach(([k,v])=>{
+        text(x0,yy-9.8,ellip(k,lw-6,8,false),8,false,C.ink2);
+        const bx=x0+lw, bwid=w-lw-vw;
+        fillRect(bx,yy-11.5,bwid,9,C.zebra); fillRect(bx,yy-11.5,Math.max(1.5,bwid*v/max),9,color);
+        text(x0+w,yy-9.8,fmt(v),8,true,C.ink,'r'); yy-=rh;
+      });
+      if(!pairs.length){text(x0,yy-9.8,opt.emptyMsg||'Sem dados.',8,false,C.ink2);yy-=rh}
+      return yy;
+    },
+    hb(pairs,opt){opt=opt||{};ensure(Math.max(pairs.length,1)*13.5+(opt.title?17:0)+6);y=this.hbars(pairs,{...opt,y:y})-8},
+    hbars2(a,b){
+      const gapX=16,w=(CW-gapX)/2;
+      ensure(Math.max(a.pairs.length,b.pairs.length,1)*13.5+24);
+      const yy=y, ya=this.hbars(a.pairs,{...a,x:M,w,y:yy}), yb=this.hbars(b.pairs,{...b,x:M+w+gapX,w,y:yy});
+      y=Math.min(ya,yb)-8;
+    },
+    /* gráfico de linha em posição explícita: {pts:[{d,v}], title, unit, fmt, x,w,h,y, goal, higherBetter, color} */
+    lineChart(cfg){
+      const w=cfg.w||CW, h=cfg.h||120, x0=cfg.x||M, yTop=cfg.y!=null?cfg.y:y, color=cfg.color||C.acc;
+      const pts=cfg.pts, fmt=cfg.fmt||(v=>v.toLocaleString('pt-BR',{maximumFractionDigits:1}));
+      fillRect(x0,yTop-h,w,h,C.zebra);
+      text(x0+10,yTop-14,ellip(cfg.title,w*0.6,9,true),9,true,C.ink);
+      if(pts.length>1){const a=pts[0].v,b=pts[pts.length-1].v,d=b-a;
+        const better=cfg.higherBetter==null?null:(cfg.higherBetter?d>0:d<0);
+        const dc=d===0||better==null?C.ink2:better?C.ok:C.bad;
+        const ds=cfg.deltaFmt?cfg.deltaFmt(d):(d>0?'+':'')+fmt(d)+(cfg.unit?' '+cfg.unit:'');
+        text(x0+w-10,yTop-14,ds,8.5,true,dc,'r')}
+      const PL=x0+46,PR=x0+w-14,PT=yTop-32,PB=yTop-h+20;
+      const vs=pts.map(p=>p.v).concat(cfg.goal!=null?[cfg.goal]:[]);
+      let mn=Math.min(...vs),mxv=Math.max(...vs); if(mn===mxv){mn-=1;mxv+=1}
+      const padv=(mxv-mn)*0.14; mn-=padv; mxv+=padv;
+      const yOf=v=>PB+(PT-PB)*((v-mn)/(mxv-mn));
+      const xOf=i=>pts.length===1?(PL+PR)/2:PL+(PR-PL)*i/(pts.length-1);
+      for(let i=0;i<=3;i++){const v=mn+(mxv-mn)*i/3;const yy=yOf(v);line(PL,yy,PR,yy,C.line,0.4);text(PL-5,yy-2.5,fmt(v),6.5,false,C.ink2,'r')}
+      if(cfg.goal!=null){const gy=yOf(cfg.goal);raw(rgb(C.warn)+' RG 0.8 w [3 2] 0 d '+n(PL)+' '+n(gy)+' m '+n(PR)+' '+n(gy)+' l S [] 0 d');text(PR,gy+2.5,'meta '+fmt(cfg.goal),6.5,true,C.warn,'r')}
+      const xy=pts.map((p,i)=>[xOf(i),yOf(p.v)]);
+      poly(xy,color,1.6);
+      const showAll=pts.length<=7;
+      xy.forEach((p,i)=>{circle(p[0],p[1],2.2,color);if(showAll||i===0||i===xy.length-1)text(i===0?p[0]+4:i===xy.length-1?p[0]-4:p[0],p[1]+5,fmt(pts[i].v),6.3,true,C.ink,i===0?'l':i===xy.length-1?'r':'c')});
+      const lab=i=>text(xOf(i),PB-9.5,fmtDM(pts[i].d)+'/'+String(pts[i].d).slice(2,4),6.5,false,C.ink2,'c');
+      if(pts.length===1)lab(0); else{lab(0);lab(pts.length-1);if(pts.length>=5)lab(Math.floor((pts.length-1)/2))}
+      return yTop-h;
+    },
+    /* grade de gráficos de linha, 2 por linha */
+    lineCharts(list,h){
+      h=h||120; const gapX=10,w=(CW-gapX)/2;
+      for(let i=0;i<list.length;i+=2){
+        ensure(h+8);
+        const yy=y; this.lineChart({...list[i],x:M,w,h,y:yy});
+        if(list[i+1])this.lineChart({...list[i+1],x:M+w+gapX,w,h,y:yy});
+        y-=h+8;
+      }
+    },
+    /* linha de "pílulas" (etiquetas) */
+    pills(items){
+      if(!items.length)return; ensure(20);
+      let x=M; const h=14;
+      for(const it of items){
+        const t=typeof it==='string'?it:it.t, [bg,fg]=tone2(typeof it==='string'?'mut':it.tone);
+        const w=pdfTW(t,7.6,true)+14;
+        if(x+w>PW-M){y-=h+5;ensure(20);x=M}
+        fillRect(x,y-h,w,h,bg); text(x+7,y-h+4,t,7.6,true,fg); x+=w+5;
+      }
+      y-=h+8;
+    },
     finish(){
-      /* obj 1 catalog, 2 pages, 3 FR, 4 FB; depois (content,page) por página */
+      const total=pages.length, p=S.data.profile||{};
+      const foot='Prancheta  |  '+(p.name||'')+(p.cref?'  |  CREF '+p.cref:'')+'  |  gerado em '+fmtDMY(todayISO());
+      pages.forEach((pOps,i)=>{ops=pOps;line(M,M+18,PW-M,M+18,C.line,0.5);text(M,M+7,foot,7,false,C.ink2);text(PW-M,M+7,'Página '+(i+1)+' de '+total,7,false,C.ink2,'r')});
       const objs=['<< /Type /Catalog /Pages 2 0 R >>','PAGES',
         '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
         '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>'];
       const kids=[];
       for(const pOps of pages){
-        const content='0.07 0.09 0.13 rg\n'+pOps.join('\n');
+        const content=pOps.join('\n');
         objs.push('<< /Length '+content.length+' >>\nstream\n'+content+'\nendstream');
         const cNum=objs.length;
         objs.push('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 '+PW+' '+PH+'] /Resources << /Font << /FR 3 0 R /FB 4 0 R >> >> /Contents '+cNum+' 0 R >>');
@@ -3352,6 +3560,7 @@ function pdfBuilder(){
       return out;
     }
   };
+  return B;
 }
 async function downloadPDF(filename,ascii){
   let dl=null;
@@ -3368,138 +3577,456 @@ async function downloadPDF(filename,ascii){
     toast('PDF baixado ✓');
   }catch(e){ toast('Não foi possível gerar o PDF.','bad'); }
 }
-function pdfHeader(P,title,subtitle){
-  P.h1('Prancheta — '+title);
-  const p=S.data.profile||{};
-  P.sub((p.name||'')+(p.cref?' - CREF '+p.cref:'')+'  |  '+subtitle+'  |  gerado em '+fmtDMY(todayISO()));
-  P.rule();
+const monthTitle=(y,m)=>MON[m-1][0].toUpperCase()+MON[m-1].slice(1)+' de '+y;
+const pdfSub=()=>{const p=S.data.profile||{};return (p.name||'')+(p.cref?'  ·  CREF '+p.cref:'')};
+/* presenças/faltas por aluno num período (prefixo de mês 'YYYY-MM' ou ano 'YYYY') */
+function attByStudent(prefix){
+  const out={}; let ok=0,miss=0;
+  for(const[idd,doc]of Object.entries(S.data.attendance)){
+    if(!doc||!doc.marks)continue;
+    const ym=idd.slice(idd.lastIndexOf('_')+1); if(!ym.startsWith(prefix))continue;
+    const sid=doc.sid||idd.slice(0,idd.lastIndexOf('_'));
+    const a=out[sid]=out[sid]||{ok:0,miss:0};
+    for(const v of Object.values(doc.marks)){if(v.s==='ok'){a.ok++;ok++}else if(v.s==='miss'){a.miss++;miss++}}
+  }
+  return{by:out,ok,miss};
 }
+const pctColor=(P,r)=>r==null?P.C.ink2:r>=80?P.C.ok:r>=60?P.C.warn:P.C.bad;
 /* ---- Relatório financeiro do mês (PDF) ---- */
 async function exportMonthPDF(y,m){
-  const ym=y+'-'+pad(m), P=pdfBuilder();
-  pdfHeader(P,'Relatório financeiro',MON[m-1][0].toUpperCase()+MON[m-1].slice(1)+' de '+y);
-  const rev=monthRevenue(y,m), gastos=expTotal(ym);
-  let aulas=0;
-  for(const[idd,doc]of Object.entries(S.data.attendance)){
-    if(!idd.endsWith('_'+ym)||!doc.marks)continue;
-    for(const v of Object.values(doc.marks))if(v.s==='ok')aulas++;
+  const ym=y+'-'+pad(m), mt=monthTitle(y,m);
+  const P=pdfBuilder({title:'Relatório financeiro',subtitle:mt});
+  P.band('Relatório financeiro — '+mt,pdfSub(),'Gerado em '+fmtDMY(todayISO())+'  ·  '+activeStudents().length+' aluno(s) ativo(s)  ·  '+students().length+' no total');
+  const rev=monthRevenue(y,m), gastos=expTotal(ym), lucro=rev.got-gastos;
+  const per=last6(y,m).map(pp=>({...pp,rec:monthRevenue(pp.y,pp.m).got,gas:expTotal(pp.ym)}));
+  const prev=per[per.length-2], cmp=prev&&prev.rec>0?Math.round((rev.got-prev.rec)/prev.rec*100):null;
+  const att=attByStudent(ym), aulas=att.ok, faltas=att.miss;
+  const reps=gymRepasse(y,m), repTotal=reps.reduce((a,r)=>a+r.total,0);
+  const od=overdueTotal(), goal=Number(settings().goalRevenue)||0;
+  const monthPacks=Object.entries(S.data.packs).map(([id,pk])=>({id,...pk})).filter(pk=>(pk.at||'').slice(0,7)===ym).sort((a,b)=>String(a.at).localeCompare(String(b.at)));
+  const packTotal=monthPacks.reduce((a,pk)=>a+(Number(pk.value)||0),0), mensal=rev.got-packTotal;
+  const exps=monthExpenses(ym).slice().sort((a,b)=>String(a.d).localeCompare(String(b.d)));
+  P.tiles([
+    {l:'Receita',v:brl(rev.got),d:cmp!=null?(cmp>=0?'+':'')+cmp+'% vs mês anterior':'mensalidades + pacotes',tone:'ok'},
+    {l:'Gastos',v:brl(gastos),d:exps.length+' lançamento(s)',tone:gastos?'bad':'mut'},
+    {l:'Lucro',v:brl(lucro),d:rev.got?Math.round(lucro/rev.got*100)+'% de margem':'receita − gastos',tone:lucro>=0?'acc':'bad'},
+    {l:'Aulas dadas',v:String(aulas),d:aulas?brl(rev.got/aulas)+' por aula':'presenças confirmadas'}]);
+  P.tiles([
+    {l:'Mensalidades',v:brl(mensal),d:'previsto '+brl(rev.exp)+(rev.exp?' ('+Math.round(mensal/rev.exp*100)+'%)':'')},
+    {l:'Pacotes vendidos',v:brl(packTotal),d:monthPacks.length+' pacote(s) · '+monthPacks.reduce((a,pk)=>a+(Number(pk.qty)||0),0)+' aulas'},
+    {l:'Inadimplência',v:brl(od),d:'meses vencidos em aberto',tone:od?'bad':'mut'},
+    {l:'Repasse devido',v:brl(repTotal),d:reps.length?reps.length+' academia(s)':(settings().gyms||[]).length?'nenhum repasse este mês':'sem academias cadastradas'}]);
+  if(goal){const gp=Math.min(100,Math.round(rev.got/goal*100));
+    P.pills([{t:'Meta do mês: '+brl(goal),tone:'acc'},{t:gp+'% atingido',tone:rev.got>=goal?'ok':gp>=70?'warn':'bad'},rev.got>=goal?{t:'Meta batida!',tone:'ok'}:{t:'faltam '+brl(goal-rev.got),tone:'mut'}])}
+  P.h2('Receita × gastos','últimos 6 meses');
+  P.bars({labels:per.map(pp=>MONS[pp.m-1]+'/'+String(pp.y).slice(2)),series:[{name:'Receita',values:per.map(pp=>pp.rec),color:P.C.acc},{name:'Gastos',values:per.map(pp=>pp.gas),color:P.C.ch2}]});
+  P.h2('Origem e destino do dinheiro',MONS[m-1]+'/'+y);
+  P.hbars2({title:'Receita por forma de recebimento',pairs:revByMethod(y,m),color:P.C.acc,emptyMsg:'Nenhum recebimento registrado.'},
+           {title:'Gastos por categoria',pairs:expByCat(ym),color:P.C.ch2,emptyMsg:'Nenhum gasto lançado.'});
+  const byMode={};
+  for(const s of students()){const rec=(payDoc(s.id,y).months||{})[String(m)];let v2=rec?recAmt(rec,s):0;
+    for(const pk of studentPacks(s.id))if((pk.at||'').slice(0,7)===ym)v2+=Number(pk.value)||0;
+    if(v2>0)byMode[modeLabel(s)]=(byMode[modeLabel(s)]||0)+v2}
+  const modePairs=Object.entries(byMode).sort((a,b)=>b[1]-a[1]);
+  if(modePairs.length>1){P.h2('Receita por modalidade',MONS[m-1]+'/'+y);P.hb(modePairs,{color:P.C.ok})}
+  /* recebimentos */
+  const recRows=[];
+  for(const s of students()){const rec=(payDoc(s.id,y).months||{})[String(m)];if(!rec)continue;const v=recAmt(rec,s);
+    recRows.push({d:rec.at||ym+'-01',c:[fmtDMY(rec.at||ym+'-01'),s.name,'Mensalidade de '+MON[m-1]+(Number(s.fee)>0&&v<Number(s.fee)?' (parcial)':v===0?' (cortesia)':''),rec.via||'—',{t:brl(v),bold:true}]})}
+  for(const pk of monthPacks){const s=stById(pk.sid);
+    recRows.push({d:pk.at,c:[fmtDMY(pk.at),s?s.name:'Aluno removido','Pacote '+(pk.name||pk.qty+' aulas')+(pk.name?' ('+pk.qty+' aulas)':'')+(pk.note?' — '+pk.note:''),pk.via||'—',{t:brl(pk.value),bold:true}]})}
+  recRows.sort((a,b)=>String(a.d).localeCompare(String(b.d)));
+  P.h2('Recebimentos',recRows.length+' lançamento(s) · '+brl(rev.got));
+  P.table([{l:'Data',w:62},{l:'Aluno',w:128},{l:'Descrição',w:180},{l:'Forma',w:75},{l:'Valor',w:70,al:'r'}],recRows.map(r=>r.c),
+    {emptyMsg:'Nenhum recebimento registrado neste mês.',total:['','','Total recebido','',brl(rev.got)]});
+  /* pendências */
+  const pend=[]; let pendTot=0;
+  for(const s of activeStudents()){if(s.plan==='pacote'||!(Number(s.fee)>0))continue;const ps=payStatus(s.id,y,m);
+    if(ps.st==='atrasado'||ps.st==='pendente'){pendTot+=Number(s.fee)||0;
+      pend.push([s.name,'Dia '+(s.dueDay||5),{t:ps.st==='atrasado'?'Atrasado':'Em aberto',color:ps.st==='atrasado'?P.C.bad:P.C.warn,bold:true},s.phone||'—',{t:brl(s.fee),bold:true}])}}
+  pend.sort((a,b)=>(a[2].t==='Atrasado'?0:1)-(b[2].t==='Atrasado'?0:1)||a[0].localeCompare(b[0]));
+  P.h2('Mensalidades em aberto',pend.length?pend.length+' aluno(s) · '+brl(pendTot):'tudo em dia');
+  P.table([{l:'Aluno',w:170},{l:'Vencimento',w:75},{l:'Situação',w:80},{l:'Telefone',w:110},{l:'Valor',w:80,al:'r'}],pend,
+    {emptyMsg:'Nenhuma mensalidade pendente — tudo em dia!',total:pend.length?['','','','Total em aberto',brl(pendTot)]:null});
+  /* gastos */
+  P.h2('Gastos',exps.length+' lançamento(s) · '+brl(gastos));
+  P.table([{l:'Data',w:62},{l:'Categoria',w:120},{l:'Descrição',w:263},{l:'Valor',w:70,al:'r'}],
+    exps.map(e2=>[fmtDMY(e2.d),e2.cat||'Outros',e2.note||'—',{t:brl(e2.v),bold:true}]),
+    {emptyMsg:'Nenhum gasto lançado neste mês.',total:['','','Total de gastos',brl(gastos)]});
+  if(reps.length){
+    P.h2('Repasse às academias',brl(repTotal));
+    P.table([{l:'Academia',w:175},{l:'Regra',w:135},{l:'Alunos pagantes',w:75,al:'c'},{l:'Lançado?',w:60,al:'c'},{l:'Valor',w:70,al:'r'}],
+      reps.map(r=>[r.g.name,r.g.kind==='pct'?r.g.rate+'% do recebido':brl(r.g.rate)+' por aluno/mês',String(r.n),exps.some(e2=>e2.gymId===r.g.id)?{t:'sim',color:P.C.ok,bold:true}:{t:'não',color:P.C.warn,bold:true},{t:brl(r.total),bold:true}]),
+      {total:['','','','Total',brl(repTotal)]});
   }
-  const reps=gymRepasse(y,m).reduce((a,r)=>a+r.total,0);
-  P.h2('Resumo');
-  P.kv('Receita do mês',brl(rev.got));
-  P.kv('Gastos do mês',brl(gastos));
-  P.kv('Lucro',brl(rev.got-gastos));
-  P.kv('Aulas dadas',aulas+(aulas?'  ('+brl(rev.got/aulas)+' por aula)':''));
-  if(reps)P.kv('Repasse devido às academias',brl(reps));
-  const od=overdueTotal(); if(od)P.kv('Inadimplência acumulada',brl(od));
-  const C={a:46,b:110,c:330,d:470,end:549};
-  P.h2('Recebimentos');
-  P.row([{x:C.a,t:'Data'},{x:C.b,t:'Descrição'},{x:C.c,t:'Forma'},{x:C.d,t:'Valor'}],{bold:true,size:9});
-  P.rule();
-  let tot=0, any=false;
-  for(const s of students()){
-    const rec=(payDoc(s.id,y).months||{})[String(m)];
-    if(!rec)continue; any=true;
-    const v=recAmt(rec,s); tot+=v;
-    P.row([{x:C.a,t:fmtDMY(rec.at||ym+'-01')},{x:C.b,t:'Mensalidade - '+s.name,next:C.c},{x:C.c,t:rec.via||'-',next:C.d},{x:C.d,t:brl(v)}]);
-  }
-  for(const p of Object.values(S.data.packs)){
-    if((p.at||'').slice(0,7)!==ym)continue; any=true;
-    const s=stById(p.sid); tot+=Number(p.value)||0;
-    P.row([{x:C.a,t:fmtDMY(p.at)},{x:C.b,t:'Pacote '+(p.name||p.qty+' aulas')+' - '+(s?s.name:''),next:C.c},{x:C.c,t:p.via||'-',next:C.d},{x:C.d,t:brl(p.value)}]);
-  }
-  if(!any)P.row([{x:C.a,t:'Nenhum recebimento registrado neste mês.'}]);
-  P.rule();
-  P.row([{x:C.b,t:'Total recebido'},{x:C.d,t:brl(tot)}],{bold:true});
-  P.h2('Gastos');
-  P.row([{x:C.a,t:'Data'},{x:C.b,t:'Categoria'},{x:C.c,t:'Descrição'},{x:C.d,t:'Valor'}],{bold:true,size:9});
-  P.rule();
-  const exps=monthExpenses(ym);
-  if(!exps.length)P.row([{x:C.a,t:'Nenhum gasto lançado neste mês.'}]);
-  for(const e2 of exps)P.row([{x:C.a,t:fmtDMY(e2.d)},{x:C.b,t:e2.cat||'Outros',next:C.c},{x:C.c,t:e2.note||'-',next:C.d},{x:C.d,t:brl(e2.v)}]);
-  P.rule();
-  P.row([{x:C.b,t:'Total de gastos'},{x:C.d,t:brl(gastos)}],{bold:true});
+  /* frequência por aluno */
+  const attRows=Object.entries(att.by).map(([sid,a])=>({s:stById(sid),a})).filter(x=>x.s).sort((a,b)=>b.a.ok-a.a.ok||a.s.name.localeCompare(b.s.name));
+  P.h2('Aulas no mês por aluno',aulas+' presença(s) · '+faltas+' falta(s)');
+  P.table([{l:'Aluno',w:215},{l:'Modalidade',w:90},{l:'Presenças',w:70,al:'c'},{l:'Faltas',w:70,al:'c'},{l:'Frequência',w:70,al:'r'}],
+    attRows.map(x=>{const tot=x.a.ok+x.a.miss, r=tot?Math.round(x.a.ok/tot*100):null;
+      return[x.s.name,modeLabel(x.s),String(x.a.ok),{t:String(x.a.miss),color:x.a.miss?P.C.bad:P.C.ink},{t:r==null?'—':r+'%',bold:true,color:pctColor(P,r)}]}),
+    {emptyMsg:'Nenhuma presença registrada neste mês.',total:['Total','',String(aulas),String(faltas),(aulas+faltas)?Math.round(aulas/(aulas+faltas)*100)+'%':'—']});
+  /* top do mês */
+  const tops=students().map(s=>{const rec=(payDoc(s.id,y).months||{})[String(m)];let tot=rec?recAmt(rec,s):0;
+    for(const pk of studentPacks(s.id))if((pk.at||'').slice(0,7)===ym)tot+=Number(pk.value)||0;return{s,tot}}).filter(x=>x.tot>0).sort((a,b)=>b.tot-a.tot).slice(0,5);
+  if(tops.length){P.h2('Maiores receitas do mês','top '+tops.length);P.hb(tops.map(x=>[x.s.name,x.tot]),{color:P.C.acc})}
+  P.note('Projeção mantendo a carteira atual: '+brl(rev.exp*3)+' nos próximos 3 meses (mensalidades ativas × 3, sem contar pacotes).');
   await downloadPDF('prancheta-relatorio-'+ym+'.pdf',P.finish());
 }
 /* ---- Relatório anual (PDF) ---- */
 async function exportYearPDF(y){
-  const P=pdfBuilder();
-  pdfHeader(P,'Relatório anual','Ano de '+y);
-  const C={a:46,b:170,c:300,d:430,end:549};
-  P.h2('Resumo por mês');
-  P.row([{x:C.a,t:'Mês'},{x:C.b,t:'Receita'},{x:C.c,t:'Gastos'},{x:C.d,t:'Lucro'}],{bold:true,size:9});
-  P.rule();
-  let tr=0,tg=0;
+  const P=pdfBuilder({title:'Relatório anual',subtitle:'Ano de '+y});
+  P.band('Relatório anual — '+y,pdfSub(),'Gerado em '+fmtDMY(todayISO())+'  ·  '+activeStudents().length+' aluno(s) ativo(s)');
+  const rows=[]; let tr=0,tg=0,tm=0,tp=0,ta=0; const recs=[],gas=[];
+  const attY=attByStudent(String(y));
   for(let m=1;m<=12;m++){
-    const r=monthRevenue(y,m).got, g=expTotal(y+'-'+pad(m));
-    tr+=r; tg+=g;
-    if(r||g)P.row([{x:C.a,t:MON[m-1][0].toUpperCase()+MON[m-1].slice(1)},{x:C.b,t:brl(r)},{x:C.c,t:brl(g)},{x:C.d,t:brl(r-g)}]);
+    const ym=y+'-'+pad(m), r=monthRevenue(y,m), g=expTotal(ym), a=attByStudent(ym).ok;
+    tr+=r.got; tg+=g; tm+=r.got-r.packSales; tp+=r.packSales; ta+=a; recs.push(r.got); gas.push(g);
+    rows.push([MON[m-1][0].toUpperCase()+MON[m-1].slice(1),brl(r.got-r.packSales),brl(r.packSales),{t:brl(r.got),bold:true},brl(g),{t:brl(r.got-g),bold:true,color:r.got-g>=0?P.C.ok:P.C.bad},String(a)]);
   }
-  P.rule();
-  P.row([{x:C.a,t:'Total do ano'},{x:C.b,t:brl(tr)},{x:C.c,t:brl(tg)},{x:C.d,t:brl(tr-tg)}],{bold:true});
-  const tops=students().map(s=>{
-    let tot=0;
-    for(const r2 of Object.values(payDoc(s.id,y).months||{}))tot+=recAmt(r2,s);
-    for(const p of studentPacks(s.id))if((p.at||'').slice(0,4)===String(y))tot+=Number(p.value)||0;
-    return{s,tot};
-  }).filter(x=>x.tot>0).sort((a,b)=>b.tot-a.tot).slice(0,10);
-  if(tops.length){
-    P.h2('Maiores clientes do ano');
-    P.row([{x:C.a,t:'Aluno'},{x:C.c,t:'Total no ano'}],{bold:true,size:9});
-    P.rule();
-    tops.forEach((x,i)=>P.row([{x:C.a,t:(i+1)+'. '+x.s.name,next:C.c},{x:C.c,t:brl(x.tot)}]));
+  const monthsWith=recs.filter(v=>v>0).length;
+  P.tiles([
+    {l:'Receita no ano',v:brl(tr),d:monthsWith?brl(tr/monthsWith)+' por mês (média)':'',tone:'ok'},
+    {l:'Gastos no ano',v:brl(tg),tone:tg?'bad':'mut',d:tr?Math.round(tg/tr*100)+'% da receita':''},
+    {l:'Lucro no ano',v:brl(tr-tg),d:tr?Math.round((tr-tg)/tr*100)+'% de margem':'',tone:tr-tg>=0?'acc':'bad'},
+    {l:'Aulas dadas',v:String(ta),d:ta?brl(tr/ta)+' por aula':'presenças confirmadas'}]);
+  const best=recs.indexOf(Math.max(...recs));
+  P.tiles([
+    {l:'Mensalidades',v:brl(tm),d:tr?Math.round(tm/tr*100)+'% da receita':''},
+    {l:'Pacotes',v:brl(tp),d:tr?Math.round(tp/tr*100)+'% da receita':''},
+    {l:'Melhor mês',v:recs[best]>0?MONS[best]:'—',d:recs[best]>0?brl(recs[best]):''},
+    {l:'Faltas no ano',v:String(attY.miss),d:(attY.ok+attY.miss)?Math.round(attY.ok/(attY.ok+attY.miss)*100)+'% de frequência geral':'',tone:attY.miss?'warn':'mut'}]);
+  P.h2('Receita × gastos','mês a mês');
+  P.bars({labels:MONS,series:[{name:'Receita',values:recs,color:P.C.acc},{name:'Gastos',values:gas,color:P.C.ch2}]});
+  P.h2('Resumo por mês');
+  P.table([{l:'Mês',w:75},{l:'Mensalidades',w:78,al:'r'},{l:'Pacotes',w:72,al:'r'},{l:'Receita',w:78,al:'r'},{l:'Gastos',w:72,al:'r'},{l:'Lucro',w:80,al:'r'},{l:'Aulas',w:45,al:'c'}],rows,
+    {total:['Total do ano',brl(tm),brl(tp),brl(tr),brl(tg),{t:brl(tr-tg),color:tr-tg>=0?P.C.ok:P.C.bad},String(ta)]});
+  /* formas e categorias no ano */
+  const byVia={}, byCat={};
+  for(let m=1;m<=12;m++){for(const[k,v]of revByMethod(y,m))byVia[k]=(byVia[k]||0)+v;for(const[k,v]of expByCat(y+'-'+pad(m)))byCat[k]=(byCat[k]||0)+v}
+  P.h2('Origem e destino do dinheiro','ano de '+y);
+  P.hbars2({title:'Receita por forma de recebimento',pairs:Object.entries(byVia).sort((a,b)=>b[1]-a[1]),color:P.C.acc,emptyMsg:'Nenhum recebimento.'},
+           {title:'Gastos por categoria',pairs:Object.entries(byCat).sort((a,b)=>b[1]-a[1]),color:P.C.ch2,emptyMsg:'Nenhum gasto.'});
+  /* top clientes */
+  const tops=students().map(s=>{let tot=0,n=0;
+    for(const r2 of Object.values(payDoc(s.id,y).months||{})){tot+=recAmt(r2,s);n++}
+    for(const p of studentPacks(s.id))if((p.at||'').slice(0,4)===String(y)){tot+=Number(p.value)||0;n++}
+    return{s,tot,n}}).filter(x=>x.tot>0).sort((a,b)=>b.tot-a.tot);
+  P.h2('Maiores clientes do ano','top '+Math.min(10,tops.length));
+  P.table([{l:'#',w:30,al:'c'},{l:'Aluno',w:220},{l:'Modalidade',w:90},{l:'Pagamentos',w:80,al:'c'},{l:'Total no ano',w:95,al:'r'}],
+    tops.slice(0,10).map((x,i)=>[String(i+1),x.s.name,modeLabel(x.s),String(x.n),{t:brl(x.tot),bold:true}]),{emptyMsg:'Nenhum recebimento no ano.'});
+  /* carteira */
+  const novos=students().filter(s=>(s.createdAt||'').slice(0,4)===String(y)).length;
+  const pausados=students().filter(s=>s.active===false).length;
+  P.h2('Carteira de alunos');
+  P.kv([['Ativos hoje',String(activeStudents().length)],['Pausados',String(pausados)],['Novos em '+y,String(novos)],['Ticket médio',tops.length?brl(tr/tops.length)+' por aluno pagante':'—']],2);
+  /* frequência anual por aluno */
+  const attRows=Object.entries(attY.by).map(([sid,a])=>({s:stById(sid),a})).filter(x=>x.s).sort((a,b)=>b.a.ok-a.a.ok||a.s.name.localeCompare(b.s.name));
+  if(attRows.length){
+    P.h2('Frequência no ano por aluno',attY.ok+' presença(s) · '+attY.miss+' falta(s)');
+    P.table([{l:'Aluno',w:230},{l:'Presenças',w:80,al:'c'},{l:'Faltas',w:80,al:'c'},{l:'Frequência',w:80,al:'r'}],
+      attRows.map(x=>{const tot=x.a.ok+x.a.miss,r=tot?Math.round(x.a.ok/tot*100):null;return[x.s.name,String(x.a.ok),{t:String(x.a.miss),color:x.a.miss?P.C.bad:P.C.ink},{t:r==null?'—':r+'%',bold:true,color:pctColor(P,r)}]}),
+      {total:['Total',String(attY.ok),String(attY.miss),(attY.ok+attY.miss)?Math.round(attY.ok/(attY.ok+attY.miss)*100)+'%':'—']});
   }
   await downloadPDF('prancheta-relatorio-'+y+'.pdf',P.finish());
 }
 /* ---- Contatos (PDF) ---- */
 async function exportContactsPDF(){
-  const P=pdfBuilder();
-  pdfHeader(P,'Contatos dos alunos',students().length+' aluno(s)');
-  const C={a:46,b:210,c:330,d:420,e:490,end:549};
-  P.row([{x:C.a,t:'Nome'},{x:C.b,t:'Telefone'},{x:C.c,t:'Modalidade'},{x:C.d,t:'Plano'},{x:C.e,t:'Status'}],{bold:true,size:9});
-  P.rule();
-  for(const s of students().sort((a,b)=>a.name.localeCompare(b.name)))
-    P.row([{x:C.a,t:s.name,next:C.b},{x:C.b,t:s.phone||'-',next:C.c},{x:C.c,t:modeLabel(s),next:C.d},
-      {x:C.d,t:s.plan==='pacote'?'Pacote':(Number(s.fee)>0?brl(s.fee):'Mensal'),next:C.e},
-      {x:C.e,t:s.active===false?'pausado':'ativo'}],{size:9});
+  const P=pdfBuilder({title:'Contatos dos alunos',subtitle:students().length+' aluno(s)'});
+  const list=students().slice().sort((a,b)=>(a.active===false?1:0)-(b.active===false?1:0)||a.name.localeCompare(b.name));
+  P.band('Contatos dos alunos',pdfSub(),activeStudents().length+' ativo(s)  ·  '+(list.length-activeStudents().length)+' pausado(s)  ·  gerado em '+fmtDMY(todayISO()));
+  P.h2('Lista de alunos');
+  P.table([{l:'Aluno',w:112},{l:'Telefone',w:74},{l:'Modalidade',w:56},{l:'Cobrança',w:92},{l:'Horários fixos',w:138},{l:'Status',w:43,al:'c'}],
+    list.map(s=>[s.name,s.phone||'—',modeLabel(s),s.plan==='pacote'?'Pacote':(Number(s.fee)>0?brl(s.fee)+' (dia '+(s.dueDay||5)+')':'Mensal'),
+      (s.schedule||[]).length?schedLabel(s):(isConsult(s)?'on-line':'—'),
+      s.active===false?{t:'pausado',color:P.C.ink2}:{t:'ativo',color:P.C.ok,bold:true}]),{size:7.6});
+  P.h2('Aniversários e emergência');
+  P.table([{l:'Aluno',w:150},{l:'Nascimento',w:75},{l:'Idade',w:45,al:'c'},{l:'Objetivo',w:95},{l:'Contato de emergência',w:105},{l:'Tel. emergência',w:80}],
+    list.map(s=>{const age=s.birth?Math.floor((Date.now()-dateOf(s.birth).getTime())/31557600000):null;
+      return[s.name,s.birth?fmtDMY(s.birth):'—',age!=null?String(age):'—',s.goal||'—',s.emgName||'—',s.emgPhone||'—']}),{size:8});
   await downloadPDF('prancheta-contatos.pdf',P.finish());
 }
-/* ---- Ficha do aluno (PDF) ---- */
+/* ---- Ficha do aluno (PDF completa, com gráficos de evolução) ---- */
+const EVAL_FIELDS=[
+  ['w','Peso','kg',false],['bf','% de gordura','%',false],['mm','Massa magra','kg',true],['mg','Massa gorda','kg',false],
+  ['waist','Cintura','cm',false],['hip','Quadril','cm',null],['arm','Braço','cm',true],['thigh','Coxa','cm',true],['chest','Peitoral','cm',true],
+];
 async function exportFichaPDF(sid){
   const s=stById(sid); if(!s)return;
-  const P=pdfBuilder();
-  pdfHeader(P,'Ficha do aluno',s.name);
-  P.h2('Dados');
-  P.kv('Modalidade',modeLabel(s));
-  P.kv('Cobrança',s.plan==='pacote'?'Pacote de aulas':'Mensalidade'+(Number(s.fee)>0?' de '+brl(s.fee)+' (vence dia '+(s.dueDay||5)+')':''));
-  if(s.goal)P.kv('Objetivo',s.goal);
-  if(s.phone)P.kv('Telefone',s.phone);
-  if(s.birth)P.kv('Nascimento',fmtDMY(s.birth));
-  if(s.height)P.kv('Altura',s.height+' cm');
-  if(s.start)P.kv('Início',fmtDMY(s.start));
-  if(s.emgName)P.kv('Emergência',s.emgName+(s.emgPhone?' - '+s.emgPhone:''));
-  if((s.schedule||[]).length)P.kv('Horários',s.schedule.map(x=>WDS[x.d]+' '+x.t+(x.w?' ('+x.w+')':'')).join(', '));
-  if(s.plan==='pacote'){
-    const pi=packInfo(s.id), ap=activePack(s.id);
-    P.h2('Pacote');
-    if(ap)P.kv('Pacote ativo',ap.name+((ap.extras||[]).length?'  (inclui: '+ap.extras.join(', ')+')':''));
-    P.kv('Saldo de aulas',pi.credits===0?'sem pacote lançado':String(pi.left)+' de '+pi.credits);
+  const t=new Date(), y=t.getFullYear(), ym=ymOf(todayISO());
+  const P=pdfBuilder({title:'Ficha do aluno',subtitle:s.name});
+  const age=s.birth?Math.floor((Date.now()-dateOf(s.birth).getTime())/31557600000):null;
+  const attA=attStatsAll(s.id), attM=attStats(s.id,ym), streak=streakOf(s.id);
+  const isPack=s.plan==='pacote', pi=isPack?packInfo(s.id):null, ap=isPack?activePack(s.id):null;
+  const wantUp=s.goal==='Hipertrofia'||s.goal==='Performance';
+  P.band('Ficha — '+s.name,[modeLabel(s),s.goal?'objetivo: '+s.goal:'',age!=null?age+' anos':'',s.active===false?'PAUSADO':'ativo'].filter(Boolean).join('  ·  '),
+    pdfSub()+'  ·  gerado em '+fmtDMY(todayISO()));
+  const ps=Number(s.fee)>0&&!isPack?payStatus(s.id,y,t.getMonth()+1):null;
+  P.tiles([
+    {l:'Frequência geral',v:attA.rate==null?'—':attA.rate+'%',d:attA.ok+' presenças · '+attA.miss+' faltas',tone:attA.rate==null?'mut':attA.rate>=80?'ok':attA.rate>=60?'warn':'bad'},
+    {l:'Este mês',v:attM.rate==null?'—':attM.rate+'%',d:attM.ok+' presenças · '+attM.miss+' faltas'},
+    {l:'Sequência',v:streak+' seguida(s)',d:streak>=3?'em ritmo!':'presenças sem falta',tone:streak>=3?'ok':'mut'},
+    isPack?{l:'Pacote',v:pi.credits===0?'sem pacote':pi.left<=0?'esgotado':pi.left+' aula(s)',d:pi.credits?'restantes de '+pi.credits+' (usadas '+pi.used+')':'nenhum lançado',tone:pi.credits===0||pi.left<=0?'bad':pi.left<=(Number(settings().packWarn)||3)?'warn':'ok'}
+          :{l:'Mensalidade',v:Number(s.fee)>0?brl(s.fee):'—',d:ps?(ps.st==='pago'?'mês atual pago':ps.st==='atrasado'?'mês atual ATRASADO':ps.st==='pendente'?'vence dia '+(s.dueDay||5):'—'):'',tone:ps?(ps.st==='pago'?'ok':ps.st==='atrasado'?'bad':'mut'):'mut'}]);
+  /* dados */
+  P.h2('Dados cadastrais');
+  const gym=(settings().gyms||[]).find(x=>x.id===s.gymId);
+  const kvs=[['Telefone',s.phone||'—'],['Tratamento',s.gender==='m'?'Ele (o)':s.gender==='f'?'Ela (a)':'Neutro'],
+    ['Nascimento',s.birth?fmtDMY(s.birth)+(age!=null?' ('+age+' anos)':''):'—'],['Início',s.start?fmtDMY(s.start):'—'],
+    ['Altura',s.height?s.height+' cm':'—'],['Meta de peso',Number(s.goalWeight)>0?Number(s.goalWeight).toLocaleString('pt-BR')+' kg':'—'],
+    ['Modalidade',modeLabel(s)+(isConsult(s)&&s.checkinDay!==''&&s.checkinDay!=null?' · check-in '+WD[Number(s.checkinDay)]:'')],['Academia',gym?gym.name:'—'],
+    ['Cobrança',isPack?'Pacote de aulas'+(ap?' — '+ap.name:''):Number(s.fee)>0?'Mensalidade de '+brl(s.fee)+', vence dia '+(s.dueDay||5):'Mensalidade (valor não definido)'],
+    ['Duração',sDur(s)+' min por sessão'],
+    ['Horários fixos',(s.schedule||[]).length?s.schedule.slice().sort((a,b)=>(a.d===0?7:a.d)-(b.d===0?7:b.d)||toMin(a.t)-toMin(b.t)).map(x=>WDS[x.d]+' '+x.t+(x.w?' ('+x.w+')':'')).join(', '):'—'],
+    ['Etiquetas',s.tags||'—'],['Emergência',s.emgName?s.emgName+(s.emgPhone?' — '+s.emgPhone:''):'—'],['Cadastrado em',s.createdAt?fmtDMY(s.createdAt):'—']];
+  P.kv(kvs,2);
+  const h=s.health||{}, hq={q1:'Problema cardíaco diagnosticado',q2:'Dor no peito ao praticar atividade',q3:'Tontura ou desmaio recente',q4:'Problema ósseo ou articular',q5:'Medicação para pressão/coração',q6:'Lesão ou cirurgia recente',q7:'Outra razão para não praticar exercício'};
+  const yes=Object.keys(hq).filter(k=>h[k]);
+  P.h2('Anamnese (PAR-Q)',yes.length?yes.length+' resposta(s) positiva(s)':'sem restrições apontadas');
+  if(yes.length)P.pills(yes.map(k=>({t:hq[k],tone:'bad'}))); else P.note('Nenhuma resposta positiva no questionário.');
+  if(h.obs)P.p('Observações de saúde: '+h.obs);
+  /* pacote / pagamentos */
+  if(isPack){
+    P.h2('Pacote de aulas',pi.credits?'saldo '+pi.left+' de '+pi.credits:'sem pacote ativo');
+    if(ap)P.kv([['Pacote ativo',ap.name],['Extras inclusos',(ap.extras||[]).length?ap.extras.join(', '):'—'],['Início do ciclo',pi.start?fmtDMY(pi.start):'—'],['Usadas no ciclo',String(pi.used)]],2);
+    const packs=studentPacks(s.id).slice().reverse();
+    P.table([{l:'Data',w:65},{l:'Pacote',w:200},{l:'Aulas',w:50,al:'c'},{l:'Forma',w:90},{l:'Valor',w:80,al:'r'}],
+      packs.map(p=>[fmtDMY(p.at),(p.name||p.qty+' aulas')+(p.note?' — '+p.note:'')+(pi.start&&String(p.at)<pi.start?' (ciclo anterior)':''),String(p.qty),p.via||'—',{t:brl(p.value),bold:true}]),
+      {emptyMsg:'Nenhum pacote lançado.'});
+  }else if(Number(s.fee)>0){
+    P.h2('Pagamentos de '+y);
+    let paidTot=0; const rowsP=[];
+    for(let m=1;m<=12;m++){const st2=payStatus(s.id,y,m); if(st2.st==='fora'||st2.st==='none')continue;
+      const v=st2.st==='pago'?recAmt(st2.rec,s):null; if(v!=null)paidTot+=v;
+      rowsP.push([MON[m-1][0].toUpperCase()+MON[m-1].slice(1),{t:st2.st==='pago'?'Pago':st2.st==='atrasado'?'Atrasado':st2.st==='pendente'?'Em aberto':'—',bold:true,color:st2.st==='pago'?P.C.ok:st2.st==='atrasado'?P.C.bad:st2.st==='pendente'?P.C.warn:P.C.ink2},
+        st2.st==='pago'?fmtDMY(st2.rec.at):'—',st2.st==='pago'?(st2.rec.via||'—'):'—',{t:v!=null?brl(v):st2.st==='futuro'?'':brl(s.fee),bold:v!=null}])}
+    P.table([{l:'Mês',w:90},{l:'Situação',w:90},{l:'Pago em',w:90},{l:'Forma',w:130},{l:'Valor',w:85,al:'r'}],rowsP,{total:['Total pago no ano','','','',brl(paidTot)]});
   }
-  const att=attStatsAll(s.id);
-  if(att.rate!==null){P.h2('Frequência');P.kv('Taxa geral',att.rate+'%  ('+att.ok+' presenças, '+att.miss+' faltas)');P.kv('Sequência atual',streakOf(s.id)+' presença(s) seguidas')}
+  /* frequência mês a mês (últimos 6) */
+  const per=last6(y,t.getMonth()+1).map(pp=>({...pp,...attStats(s.id,pp.ym)}));
+  if(per.some(pp=>pp.ok||pp.miss)){
+    P.h2('Frequência','últimos 6 meses');
+    P.bars({labels:per.map(pp=>MONS[pp.m-1]+'/'+String(pp.y).slice(2)),series:[{name:'Presenças',values:per.map(pp=>pp.ok),color:P.C.ok},{name:'Faltas',values:per.map(pp=>pp.miss),color:P.C.bad}],fmt:v=>String(Math.round(v)),h:110});
+  }
+  /* avaliações */
   const ev=((S.data.evals[s.id]||{}).entries||[]).slice().sort((a,b)=>a.d.localeCompare(b.d));
-  if(ev.length){
-    P.h2('Últimas avaliações');
-    const C={a:46,b:130,c:220,d:310,e:400,end:549};
-    P.row([{x:C.a,t:'Data'},{x:C.b,t:'Peso'},{x:C.c,t:'% Gordura'},{x:C.d,t:'M. magra'},{x:C.e,t:'Ritmo'}],{bold:true,size:9});
-    P.rule();
-    for(const e2 of ev.slice(-8)){
-      const pc=paceOf(e2.runDist,e2.runTime);
-      P.row([{x:C.a,t:fmtDMY(e2.d)},{x:C.b,t:e2.w?e2.w+' kg':'-'},{x:C.c,t:e2.bf?e2.bf+' %':'-'},{x:C.d,t:e2.mm?e2.mm+' kg':'-'},{x:C.e,t:pc?fmtPace(pc):'-'}]);
+  P.h2('Avaliações físicas',ev.length?ev.length+' avaliação(ões)':'nenhuma registrada');
+  if(!ev.length)P.note('Nenhuma avaliação registrada ainda.');
+  else{
+    const last=ev[ev.length-1], first=ev[0];
+    const imc=imcOf(evalVal(last,'w'),s.height);
+    const rcq=Number(last.waist)>0&&Number(last.hip)>0?Number(last.waist)/Number(last.hip):null;
+    const pace=paceOf(last.runDist,last.runTime);
+    const fmt1=v=>v.toLocaleString('pt-BR',{maximumFractionDigits:1});
+    P.h3('Última avaliação — '+fmtDMY(last.d)+(last.note?' · '+last.note:''));
+    const tl=[];
+    if(evalVal(last,'w')!=null)tl.push({l:'Peso',v:fmt1(evalVal(last,'w'))+' kg',d:Number(s.goalWeight)>0?'meta '+Number(s.goalWeight).toLocaleString('pt-BR')+' kg':''});
+    if(imc!=null)tl.push({l:'IMC',v:n1(imc),d:imcClass(imc),tone:imc<18.5?'warn':imc<25?'ok':imc<30?'warn':'bad'});
+    if(evalVal(last,'bf')!=null)tl.push({l:'% de gordura',v:fmt1(evalVal(last,'bf'))+' %'});
+    if(evalVal(last,'mm')!=null)tl.push({l:'Massa magra',v:fmt1(evalVal(last,'mm'))+' kg'});
+    if(evalVal(last,'mg')!=null)tl.push({l:'Massa gorda',v:fmt1(evalVal(last,'mg'))+' kg'});
+    if(rcq!=null)tl.push({l:'RCQ',v:n2(rcq),d:'cintura ÷ quadril'});
+    if(pace!=null)tl.push({l:'Ritmo de corrida',v:fmtPace(pace),d:n1(last.runDist)+' km em '+n1(last.runTime)+' min'});
+    if(tl.length)P.tiles(tl,Math.min(4,tl.length));
+    if(ev.length>=2){
+      const cmpRows=[];
+      for(const[k,l,u,up]of EVAL_FIELDS){const a=evalVal(first,k),b=evalVal(last,k);if(a==null||b==null)continue;const d=b-a;
+        const good=up==null?null:(k==='w'?(wantUp?d>0:d<0):up?d>0:d<0);
+        cmpRows.push([l,fmt1(a)+' '+u,fmt1(b)+' '+u,{t:(d>0?'+':'')+fmt1(d)+' '+u,bold:true,color:d===0||good==null?P.C.ink2:good?P.C.ok:P.C.bad},a?{t:(d>0?'+':'')+Math.round(d/a*100)+'%',color:P.C.ink2}:'—'])}
+      const pa=paceOf(first.runDist,first.runTime),pb=pace;
+      if(pa!=null&&pb!=null){const d=pb-pa;cmpRows.push(['Ritmo de corrida',fmtPace(pa),fmtPace(pb),{t:(d>0?'+':'')+Math.round(d*60)+' s/km',bold:true,color:d===0?P.C.ink2:d<0?P.C.ok:P.C.bad},pa?{t:(d>0?'+':'')+Math.round(d/pa*100)+'%',color:P.C.ink2}:'—'])}
+      if(cmpRows.length){P.h3('Primeira × última avaliação ('+fmtDMY(first.d)+' → '+fmtDMY(last.d)+')');
+        P.table([{l:'Métrica',w:150},{l:'Primeira',w:90,al:'r'},{l:'Última',w:90,al:'r'},{l:'Variação',w:100,al:'r'},{l:'%',w:85,al:'r'}],cmpRows)}
+      /* gráficos de evolução */
+      const charts=[];
+      for(const[k,l,u,up]of EVAL_FIELDS){const pts=ev.map(e2=>({d:e2.d,v:evalVal(e2,k)})).filter(x=>x.v!=null);if(pts.length<2)continue;
+        charts.push({title:l+' ('+u+')',pts,unit:u,higherBetter:k==='w'?wantUp:up,goal:k==='w'&&Number(s.goalWeight)>0?Number(s.goalWeight):null,color:k==='w'?P.C.acc:k==='bf'||k==='mg'?P.C.ch2:P.C.ok})}
+      const ptsPace=ev.map(e2=>({d:e2.d,v:paceOf(e2.runDist,e2.runTime)})).filter(x=>x.v!=null);
+      if(ptsPace.length>=2)charts.push({title:'Ritmo de corrida (min/km)',pts:ptsPace,fmt:v=>fmtPace(v),deltaFmt:d=>(d>0?'+':'')+Math.round(d*60)+' s/km',higherBetter:false,color:P.C.ok});
+      const ptsImc=s.height?ev.map(e2=>({d:e2.d,v:imcOf(evalVal(e2,'w'),s.height)})).filter(x=>x.v!=null):[];
+      if(ptsImc.length>=2)charts.push({title:'IMC',pts:ptsImc,higherBetter:wantUp?null:false,color:P.C.acc});
+      if(charts.length){P.h3('Evolução');P.lineCharts(charts)}
+    }
+    P.h3('Histórico de avaliações');
+    const c1=v=>v==null?'—':v.toLocaleString('pt-BR',{maximumFractionDigits:1});
+    P.table([{l:'Data',w:58},{l:'Peso',w:42,al:'r'},{l:'%G',w:38,al:'r'},{l:'MM',w:42,al:'r'},{l:'MG',w:42,al:'r'},{l:'Cint.',w:40,al:'r'},{l:'Quad.',w:40,al:'r'},{l:'Braço',w:40,al:'r'},{l:'Coxa',w:40,al:'r'},{l:'Peit.',w:40,al:'r'},{l:'Corrida',w:62,al:'r'},{l:'Obs.',w:70}],
+      ev.slice().reverse().map(e2=>{const pc=paceOf(e2.runDist,e2.runTime);
+        return[fmtDMY(e2.d),c1(evalVal(e2,'w')),c1(evalVal(e2,'bf')),c1(evalVal(e2,'mm')),c1(evalVal(e2,'mg')),c1(evalVal(e2,'waist')),c1(evalVal(e2,'hip')),c1(evalVal(e2,'arm')),c1(evalVal(e2,'thigh')),c1(evalVal(e2,'chest')),pc!=null?fmtPace(pc):'—',e2.note||'—']}),{size:7.8});
+  }
+  /* progressão de carga */
+  const exs=(loadsDoc(s.id).exercises||[]).map(ex=>({ex,st:exStats(ex)})).filter(x=>x.st);
+  P.h2('Progressão de carga',exs.length?exs.length+' exercício(s)':'nenhum exercício');
+  if(!exs.length)P.note('Nenhum exercício com carga registrada.');
+  else{
+    const ld=e=>kgFmt(e.kg)+' kg'+(Number(e.reps)>0?' × '+e.reps:'');
+    P.table([{l:'Exercício',w:118},{l:'Primeira carga',w:68,al:'r'},{l:'em',w:52},{l:'Carga atual',w:68,al:'r'},{l:'em',w:52},{l:'Melhor',w:50,al:'r'},{l:'1RM est.',w:52,al:'r'},{l:'Evolução',w:55,al:'r'}],
+      exs.map(({ex,st})=>[ex.name,ld(st.first),fmtDMY(st.first.d),{t:ld(st.last),bold:true},fmtDMY(st.last.d),kgFmt(st.best.kg)+' kg',kgFmt(st.rm1)+' kg',{t:st.pct==null?'—':(st.pct>0?'+':'')+st.pct+'%',bold:true,color:st.pct>0?P.C.ok:st.pct<0?P.C.bad:P.C.ink2}]),{size:8});
+    const charts=exs.filter(x=>x.st.n>=2).map(({ex,st})=>({title:ex.name+' (kg)',pts:st.entries.slice(-14).map(e2=>({d:e2.d,v:Number(e2.kg)||0})),unit:'kg',higherBetter:true,color:P.C.acc}));
+    if(charts.length){P.h3('Evolução da carga');P.lineCharts(charts,112)}
+    P.note('1RM estimada pela fórmula de Epley: carga × (1 + repetições ÷ 30).');
+  }
+  /* consultoria */
+  if(isConsult(s)){
+    const cd=consultDoc(s.id), pst=planStatus(s.id);
+    P.h2('Consultoria',pst.st==='none'?'sem treino enviado':pst.st==='vencido'?'treino vencido há '+(-pst.days)+' dia(s)':pst.st==='vencendo'?'treino vence em '+pst.days+' dia(s)':'treino em dia ('+pst.days+' dias restantes)');
+    P.table([{l:'Envio',w:70},{l:'Treino',w:260},{l:'Validade',w:70,al:'c'},{l:'Vence em',w:70}],
+      (cd.plans||[]).slice().reverse().map(p=>[fmtDMY(p.d),(p.note||'—')+(p.link?' · '+p.link:''),p.weeks+' sem.',fmtDMY(addDays(p.d,(Number(p.weeks)||4)*7))]),{emptyMsg:'Nenhum treino registrado.'});
+    const cks=(cd.checkins||[]).slice().reverse().slice(0,12);
+    if(cks.length){P.h3('Check-ins ('+(cd.checkins||[]).length+')');P.table([{l:'Data',w:70},{l:'Feedback',w:445}],cks.map(c=>[fmtDMY(c.d),c.note||'ok']))}
+  }
+  /* diário e documentos */
+  const notes=(consultDoc(s.id).notes||[]).slice().reverse();
+  if(notes.length){P.h2('Diário do aluno',notes.length+' anotação(ões)');for(const nt of notes.slice(0,20))P.p(fmtDMY(nt.d)+' — '+nt.t,{size:9})}
+  if((s.docs||[]).length){P.h2('Documentos');P.table([{l:'Documento',w:170},{l:'Link',w:345}],s.docs.map(d2=>[d2.name,d2.url]))}
+  if(s.notes){P.h2('Observações');P.p(s.notes)}
+  await downloadPDF('prancheta-ficha-'+firstName(s.name).toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g,'')+'.pdf',P.finish());
+}
+/* ===== progressão de carga (exercícios do aluno) =====
+   coleção `loads`: um doc por aluno {sid, exercises:[{id,name,entries:[{d,kg,reps,sets,note}]}]} */
+const EX_LIST=['Agachamento livre','Agachamento no smith','Leg press','Cadeira extensora','Mesa flexora','Stiff','Levantamento terra','Hip thrust','Afundo','Panturrilha em pé',
+  'Supino reto','Supino inclinado','Supino com halteres','Crucifixo','Desenvolvimento','Elevação lateral','Puxada alta','Remada curvada','Remada baixa','Barra fixa',
+  'Rosca direta','Rosca martelo','Tríceps pulley','Tríceps testa','Abdominal','Prancha (segundos)','Corrida (km)'];
+function loadsDoc(sid){ return S.data.loads[sid]||{sid,exercises:[]}; }
+const kgFmt=v=>(Number(v)||0).toLocaleString('pt-BR',{maximumFractionDigits:1});
+const fmtLoad=e=>kgFmt(e.kg)+' kg'+(Number(e.reps)>0?' × '+e.reps:'')+(Number(e.sets)>0?' ('+e.sets+'s)':'');
+const rm1Of=e=>Number(e.kg)*(1+(Number(e.reps)||1)/30);
+function exStats(ex){
+  const en=(ex.entries||[]).slice().sort((a,b)=>String(a.d).localeCompare(String(b.d)));
+  if(!en.length)return null;
+  const first=en[0], last=en[en.length-1];
+  let best=en[0]; for(const e of en)if(Number(e.kg)>Number(best.kg))best=e;
+  const pct=Number(first.kg)>0?Math.round((Number(last.kg)-Number(first.kg))/Number(first.kg)*100):null;
+  return{first,last,best,rm1:rm1Of(last),rmBest:Math.max(...en.map(rm1Of)),pct,n:en.length,entries:en};
+}
+function saveExercise(sid,ex){
+  const doc=clone(loadsDoc(sid)); doc.exercises=doc.exercises||[];
+  const i=doc.exercises.findIndex(x=>x.id===ex.id);
+  if(i>=0)doc.exercises[i]=ex; else doc.exercises.push(ex);
+  putDoc('loads',sid,doc);
+}
+function addLoadEntry(sid,exId,entry){
+  const doc=clone(loadsDoc(sid)); const ex=(doc.exercises||[]).find(x=>x.id===exId); if(!ex)return false;
+  ex.entries=ex.entries||[]; ex.entries.push(entry);
+  ex.entries.sort((a,b)=>String(a.d).localeCompare(String(b.d)));
+  putDoc('loads',sid,doc); return true;
+}
+/* recordes recentes: carga acima de todas as anteriores, dentro de N dias */
+function recentPRs(days){
+  const cut=addDays(todayISO(),-(days||7)), out=[];
+  for(const s of activeStudents()){
+    for(const ex of (loadsDoc(s.id).exercises||[])){
+      const en=(ex.entries||[]).slice().sort((a,b)=>String(a.d).localeCompare(String(b.d)));
+      let max=-Infinity;
+      en.forEach((e,i)=>{const kg=Number(e.kg)||0; if(i>0&&kg>max&&e.d>=cut)out.push({s,ex,e,prev:max}); if(kg>max)max=kg});
     }
   }
-  if(s.notes){P.h2('Observações');P.row([{x:46,t:s.notes,next:549}])}
-  await downloadPDF('prancheta-ficha-'+firstName(s.name).toLowerCase()+'.pdf',P.finish());
+  return out.sort((a,b)=>String(b.e.d).localeCompare(String(a.e.d)));
+}
+function cargasText(sid){
+  const exs=(loadsDoc(sid).exercises||[]).map(ex=>({ex,st:exStats(ex)})).filter(x=>x.st);
+  return exs.map(({ex,st})=>'• '+ex.name+': '+(st.n<2?'*'+kgFmt(st.last.kg)+' kg* (primeiro registro)':kgFmt(st.first.kg)+' kg → *'+kgFmt(st.last.kg)+' kg*'+(st.pct?' ('+(st.pct>0?'+':'')+st.pct+'%)':'')+(Number(st.best.kg)>Number(st.last.kg)?' · melhor: '+kgFmt(st.best.kg)+' kg':' 🏆'))).join('\n');
+}
+function loadSectionHTML(s,wa){
+  const exs=(loadsDoc(s.id).exercises||[]).map(ex=>({ex,st:exStats(ex)}));
+  return `<div class="sec"><div class="row between" style="flex-wrap:wrap;gap:8px"><div class="eyebrow">Progressão de carga</div>
+    <div class="row" style="gap:7px">
+      ${wa&&exs.some(x=>x.st)?`<button class="btn sm ghost" data-a="wa-cargas" data-sid="${s.id}">${I.msg} Enviar evolução</button>`:''}
+      <button class="btn sm" data-a="ex-new" data-sid="${s.id}">${I.plus} Exercício</button>
+    </div></div>
+    ${exs.length?exs.map(({ex,st})=>{
+      const series=st?st.entries.slice(-12).map(e=>({d:e.d,v:Number(e.kg)||0})):[];
+      const hist=st?st.entries.slice(-4).reverse():[];
+      return`<div class="card" style="margin-bottom:9px">
+        <div class="row between" style="flex-wrap:wrap;gap:6px;align-items:flex-start">
+          <div class="grow" style="min-width:150px"><b style="font-size:15px">🏋️ ${esc(ex.name)}</b>
+            <div class="small muted">${st?'último: <b>'+esc(fmtLoad(st.last))+'</b> · '+fmtDMY(st.last.d):'sem registro de carga'}</div></div>
+          ${st?`<div class="row" style="gap:5px;flex-wrap:wrap">
+            <span class="pill ok mono" title="Maior carga registrada">🏆 ${kgFmt(st.best.kg)} kg</span>
+            <span class="pill acc mono" title="1RM estimada (Epley)">1RM ≈ ${kgFmt(st.rm1)} kg</span>
+            ${st.pct!=null&&st.n>1?`<span class="pill ${st.pct>0?'ok':st.pct<0?'warn':'mut'} mono" title="Desde o primeiro registro">${st.pct>0?'+':''}${st.pct}%</span>`:''}
+          </div>`:''}
+        </div>
+        ${series.length>=2?`<div style="margin-top:8px">${metricChart(series,['kg','Carga','kg',1])}</div>`:''}
+        ${hist.length?`<div style="margin-top:8px">${hist.map(e=>{const idx=st.entries.indexOf(e);
+          return`<div class="row small" style="padding:4px 0;border-top:1px solid var(--line)"><span class="mono" style="width:78px">${fmtDMY(e.d)}</span><span class="grow"><b>${esc(fmtLoad(e))}</b>${e.note?'<span class="muted"> · '+esc(e.note)+'</span>':''}</span>
+            <button class="icon-btn" style="width:26px;height:26px" data-a="ex-entry-del" data-sid="${s.id}" data-ex="${ex.id}" data-d="${esc(e.d)}" data-i="${idx}" title="Excluir registro">${I.x}</button></div>`}).join('')}
+          ${st.n>4?`<div class="small muted" style="padding-top:4px">+ ${st.n-4} registro(s) anterior(es)</div>`:''}</div>`:''}
+        <div class="row" style="margin-top:9px;gap:7px;flex-wrap:wrap">
+          <button class="btn sm" data-a="ex-log" data-sid="${s.id}" data-ex="${ex.id}">${I.plus} Registrar carga</button>
+          <button class="btn sm soft" data-a="ex-rename" data-sid="${s.id}" data-ex="${ex.id}">${I.edit} Renomear</button>
+          <button class="btn sm danger ghost" data-a="ex-del" data-sid="${s.id}" data-ex="${ex.id}">${I.trash}</button>
+        </div>
+      </div>`}).join('')
+    :'<p class="small muted">Cadastre os exercícios principais (agachamento, supino, remada…) e registre a carga a cada treino — a evolução aparece em gráfico e na ficha em PDF.</p>'}
+  </div>`;
+}
+function openExerciseForm(sid,exId){
+  const s=stById(sid); if(!s)return;
+  const ex=exId?(loadsDoc(sid).exercises||[]).find(x=>x.id===exId):null;
+  const id=uid('ex');
+  openLayer(`<div class="modal" role="dialog">
+    <div class="m-head"><h2>${ex?'Renomear exercício':'Novo exercício — '+esc(firstName(s.name))}</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
+    <div class="m-body">
+      <div class="f"><label>Exercício *</label><input id="${id}-n" list="${id}-dl" value="${esc(ex?ex.name:'')}" placeholder="Ex.: Agachamento livre" autocomplete="off">
+        <datalist id="${id}-dl">${EX_LIST.map(x=>`<option value="${esc(x)}">`).join('')}</datalist></div>
+      ${ex?'':`<div class="eyebrow" style="margin:4px 0 8px">Primeira carga (opcional)</div>
+      <div class="f2">
+        <div class="f"><label>Carga (kg)</label><input id="${id}-k" type="number" min="0" step="0.5" inputmode="decimal" placeholder="Ex.: 40"></div>
+        <div class="f"><label>Repetições</label><input id="${id}-r" type="number" min="1" max="100" inputmode="numeric" placeholder="Ex.: 10"></div>
+      </div>
+      <div class="f2">
+        <div class="f"><label>Séries</label><input id="${id}-s" type="number" min="1" max="20" inputmode="numeric" placeholder="Ex.: 3"></div>
+        ${dateField(id+'-d','Data',todayISO())}
+      </div>`}
+      <div id="${id}-err"></div>
+    </div>
+    <div class="m-foot"><button class="btn soft" data-a="layer-close">Cancelar</button><button class="btn" id="${id}-ok">${ex?'Salvar':'Adicionar'}</button></div>
+  </div>`,{sheet:true});
+  $('#'+id+'-ok').addEventListener('click',()=>{
+    const name=$('#'+id+'-n').value.trim();
+    if(!name){$('#'+id+'-err').innerHTML='<div class="f"><div class="err">Informe o nome do exercício.</div></div>';return}
+    const dup=(loadsDoc(sid).exercises||[]).find(x=>x.name.toLowerCase()===name.toLowerCase()&&(!ex||x.id!==ex.id));
+    if(dup){$('#'+id+'-err').innerHTML='<div class="f"><div class="err">Esse exercício já está cadastrado.</div></div>';return}
+    if(ex){saveExercise(sid,{...ex,name});closeAllLayers();renderMain();toast('Exercício renomeado ✓');return}
+    const nx={id:uid('x'),name,entries:[]};
+    const kg=Number($('#'+id+'-k').value), reps=Number($('#'+id+'-r').value), sets=Number($('#'+id+'-s').value), d=$('#'+id+'-d').value;
+    if($('#'+id+'-k').value!==''){
+      if(!(kg>=0)||!d){$('#'+id+'-err').innerHTML='<div class="f"><div class="err">Carga inválida ou data em branco.</div></div>';return}
+      nx.entries.push({d,kg,reps:reps>0?reps:null,sets:sets>0?sets:null,note:''});
+    }
+    saveExercise(sid,nx); closeAllLayers(); renderMain(); toast('Exercício adicionado ✓');
+  });
+}
+function openLoadLog(sid,exId){
+  const s=stById(sid), ex=(loadsDoc(sid).exercises||[]).find(x=>x.id===exId); if(!s||!ex)return;
+  const st=exStats(ex), last=st?st.last:null, id=uid('lg');
+  openLayer(`<div class="modal" role="dialog">
+    <div class="m-head"><h2>${esc(ex.name)}</h2><button class="icon-btn" data-a="layer-close">${I.x}</button></div>
+    <div class="m-body">
+      ${st?`<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:12px"><span class="pill mut mono">último ${esc(fmtLoad(last))}</span><span class="pill ok mono">🏆 ${kgFmt(st.best.kg)} kg</span></div>`:''}
+      <div class="f2">
+        <div class="f"><label>Carga (kg) *</label><input id="${id}-k" type="number" min="0" step="0.5" inputmode="decimal" value="${last?esc(String(last.kg)):''}" placeholder="0"></div>
+        <div class="f"><label>Repetições</label><input id="${id}-r" type="number" min="1" max="100" inputmode="numeric" value="${last&&last.reps?esc(String(last.reps)):''}" placeholder="Ex.: 10"></div>
+      </div>
+      <div class="f2">
+        <div class="f"><label>Séries</label><input id="${id}-s" type="number" min="1" max="20" inputmode="numeric" value="${last&&last.sets?esc(String(last.sets)):''}" placeholder="Ex.: 3"></div>
+        ${dateField(id+'-d','Data',todayISO())}
+      </div>
+      <div class="f"><label>Observação (opcional)</label><input id="${id}-n" placeholder="Ex.: última série difícil, aumentar na próxima"></div>
+      <p class="hint" style="color:var(--ink2);font-size:11.5px">Exercícios de peso corporal: use 0 kg e registre as repetições. Prancha/corrida: use o campo de carga como segundos/km.</p>
+      <div id="${id}-err"></div>
+    </div>
+    <div class="m-foot"><button class="btn soft" data-a="layer-close">Cancelar</button><button class="btn" id="${id}-ok">Registrar</button></div>
+  </div>`,{sheet:true});
+  $('#'+id+'-ok').addEventListener('click',()=>{
+    const kg=Number($('#'+id+'-k').value), reps=Number($('#'+id+'-r').value), sets=Number($('#'+id+'-s').value), d=$('#'+id+'-d').value;
+    if($('#'+id+'-k').value===''||!(kg>=0)||!d){$('#'+id+'-err').innerHTML='<div class="f"><div class="err">Informe a carga e a data.</div></div>';return}
+    const prevBest=st?Number(st.best.kg):null;
+    addLoadEntry(sid,exId,{d,kg,reps:reps>0?reps:null,sets:sets>0?sets:null,note:$('#'+id+'-n').value.trim()});
+    closeAllLayers(); renderMain();
+    if(prevBest!=null&&kg>prevBest)toast('🏆 Novo recorde em '+ex.name+': '+kgFmt(kg)+' kg!');
+    else toast('Carga registrada ✓');
+  });
 }
 /* ===== v4: consultoria, treinos, fixos, espera, ficha ===== */
 function openWorkoutTpls(){
@@ -3678,6 +4205,7 @@ function fichaText(s){
     att.rate!==null?'Frequência geral: '+att.rate+'% ('+att.ok+'✓/'+att.miss+'✗)':'',
     s.height?'Altura: '+s.height+' cm':'',
     last&&last.w?'Último peso: '+last.w+' kg ('+fmtDMY(last.d)+')':'',
+    cargasText(s.id)?'Cargas:\n'+cargasText(s.id):'',
     s.notes?'Obs.: '+s.notes:'',
   ].filter(Boolean);
   return L.join('\n');
@@ -3816,7 +4344,7 @@ function vMais(){
     <button class="cfgrow" data-a="send-file"><span class="lead">${I.dl}</span><span class="grow"><div class="t">Arquivos e links</div><div class="d">${(st.files||[]).length?(st.files||[]).map(f=>esc(f.name)).join(' · '):'Cartão virtual, CREF, contrato — para enviar com 1 toque'}</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
     <button class="cfgrow" data-a="mg-workouts"><span class="lead">${I.chart}</span><span class="grow"><div class="t">Modelos de treino</div><div class="d">${(st.workoutTpls||[]).length?(st.workoutTpls||[]).length+' modelo(s) para enviar na consultoria':'Biblioteca de treinos para envio rápido'}</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
     <button class="cfgrow" data-a="mg-recexp"><span class="lead">${I.wallet}</span><span class="grow"><div class="t">Gastos fixos mensais</div><div class="d">${(st.recurringExp||[]).length?(st.recurringExp||[]).length+' fixo(s) · '+brl((st.recurringExp||[]).reduce((a,r)=>a+(Number(r.v)||0),0))+'/mês':'Aluguel de espaço, apps, contador…'}</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
-    <button class="cfgrow" data-a="tpl-edit"><span class="lead">${I.msg}</span><span class="grow"><div class="t">Mensagens do WhatsApp</div><div class="d">8 modelos com variáveis + assinatura personalizável</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
+    <button class="cfgrow" data-a="tpl-edit"><span class="lead">${I.msg}</span><span class="grow"><div class="t">Mensagens do WhatsApp</div><div class="d">9 modelos com variáveis + assinatura personalizável</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
     <button class="cfgrow" data-a="notif-prefs"><span class="lead">${I.bell}</span><span class="grow"><div class="t">Notificações e lembretes</div><div class="d">${Number(st.remindMin)>0?'Aviso '+st.remindMin+' min antes do treino':'Aviso de treino desligado'} · pacote com ${st.packWarn} aula(s)</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
     <button class="cfgrow" data-a="mg-gyms"><span class="lead">${I.bldg}</span><span class="grow"><div class="t">Academias e repasse</div><div class="d">${(st.gyms||[]).length?(st.gyms||[]).map(g=>esc(g.name)).join(', '):'Nenhuma academia cadastrada'}</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
     <button class="cfgrow" data-a="mg-methods"><span class="lead">${I.wallet}</span><span class="grow"><div class="t">Formas de recebimento</div><div class="d">${(st.payMethods||[]).map(esc).join(', ')}</div></span>${I.chr.replace('<svg','<svg class="chev"')}</button>
@@ -3849,7 +4377,7 @@ function vMais(){
       return rows.map(r2=>`<div class="row small" style="padding:5px 0"><span class="grow muted" style="font-weight:600">${r2[0]}</span><b class="mono">${esc(r2[1])}</b></div>`).join('');
     })()}
   </div></div>
-  <p class="small muted" style="text-align:center;margin-top:26px">Prancheta v4 · feita para ${esc(firstName(p.name))} 💙</p>`;
+  <p class="small muted" style="text-align:center;margin-top:26px">Prancheta ${VERSION} · feita para ${esc(firstName(p.name))} 💙</p>`;
 }
 function openProfileForm(){
   const p=S.data.profile, id=uid('pf');
@@ -4403,6 +4931,28 @@ const A={
     if(href)window.open(href,'_blank','noopener');
   },
   'eval-new':el=>openEvalForm(el.dataset.sid),
+  /* progressão de carga */
+  'ex-new':el=>openExerciseForm(el.dataset.sid,null),
+  'ex-rename':el=>openExerciseForm(el.dataset.sid,el.dataset.ex),
+  'ex-log':el=>openLoadLog(el.dataset.sid,el.dataset.ex),
+  'ex-del':el=>{
+    const sid=el.dataset.sid, ex=(loadsDoc(sid).exercises||[]).find(x=>x.id===el.dataset.ex); if(!ex)return;
+    confirmDlg({title:'Excluir exercício',danger:true,okLabel:'Excluir',
+      msg:`Excluir <b>${esc(ex.name)}</b> e os ${(ex.entries||[]).length} registro(s) de carga?`,
+      onOk:()=>{const doc=clone(loadsDoc(sid));doc.exercises=(doc.exercises||[]).filter(x=>x.id!==ex.id);putDoc('loads',sid,doc);renderMain();toast('Exercício excluído.')}});
+  },
+  'ex-entry-del':el=>{
+    const sid=el.dataset.sid, doc=clone(loadsDoc(sid)), ex=(doc.exercises||[]).find(x=>x.id===el.dataset.ex); if(!ex)return;
+    ex.entries=(ex.entries||[]).slice().sort((a,b)=>String(a.d).localeCompare(String(b.d)));
+    const i=Number(el.dataset.i); if(!ex.entries[i]||ex.entries[i].d!==el.dataset.d)return;
+    ex.entries.splice(i,1); putDoc('loads',sid,doc); renderMain(); toast('Registro removido.');
+  },
+  'wa-cargas':el=>{
+    const s=stById(el.dataset.sid); if(!s)return;
+    const txt=cargasText(s.id); if(!txt){toast('Registre cargas primeiro.','warn');return}
+    const href=waMsgHref(s.phone,waText('cargas',s,{cargas:txt}));
+    if(href)window.open(href,'_blank','noopener'); else toast('Este aluno não tem telefone cadastrado.','warn');
+  },
   'eval-del':el=>{
     const sid=el.dataset.sid, i=Number(el.dataset.i);
     const doc=clone(S.data.evals[sid]); if(!doc)return;
