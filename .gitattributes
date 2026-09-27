@@ -1,0 +1,9 @@
+# Normaliza para LF no repositorio e deixa a quebra de linha nativa na copia de
+# trabalho. O app ja e publicado pelo GitHub Pages e o CI roda em Linux, entao
+# converto e com o minimo possivel de surpresa.
+* text=auto
+
+# O icone e binario: nao tocar.
+*.png binary
+*.jpg binary
+*.jpeg binary

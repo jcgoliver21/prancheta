@@ -1,0 +1,20 @@
+# dependencias de desenvolvimento (o app em si nao tem nenhuma)
+node_modules/
+
+# package-lock.json e versionado de proposito: o CI roda `npm ci`, que
+# precisa do lockfile para instalar exatamente as mesmas versoes.
+
+# artefatos de teste
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+coverage/
+
+# logs e temporarios
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.env
+.env.local
